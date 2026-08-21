@@ -1,0 +1,26 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.required {
+  color: var(--destructive);
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--muted-foreground);
+}
+
+.error {
+  font-size: 0.78rem;
+  color: var(--destructive);
+  font-weight: 500;
+}

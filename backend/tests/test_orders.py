@@ -27,7 +27,8 @@ def test_create_order_success(auth_override):
         ),
         "supermarkets": chain_mock(
             FakeResult(data={"id": str(supermarket_id), "name": "Vital",
-                              "address": None, "logo_url": None, "is_active": True})
+                              "address": None, "logo_url": None, "is_active": True,
+                              "chains": {"status": "approved"}})
         ),
         "shopping_list_items": chain_mock(
             FakeResult(data=[{"product_id": product_id, "quantity": 2}])
@@ -84,7 +85,8 @@ def test_create_order_incomplete_stock(auth_override):
         ),
         "supermarkets": chain_mock(
             FakeResult(data={"id": str(supermarket_id), "name": "Jaguar",
-                              "address": None, "logo_url": None, "is_active": True})
+                              "address": None, "logo_url": None, "is_active": True,
+                              "chains": {"status": "approved"}})
         ),
         "shopping_list_items": chain_mock(
             FakeResult(data=[{"product_id": product_id, "quantity": 1}])

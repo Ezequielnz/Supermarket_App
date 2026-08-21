@@ -1,0 +1,57 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  max-width: 640px;
+  padding: 1.6rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.1rem;
+}
+
+@media (min-width: 560px) {
+  .row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.success,
+.error,
+.readonly {
+  padding: 0.7rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: calc(var(--radius) - 0.4rem);
+  border: 1px solid transparent;
+}
+
+.success {
+  color: color-mix(in oklch, var(--success) 72%, black);
+  background: color-mix(in oklch, var(--success) 10%, transparent);
+  border-color: color-mix(in oklch, var(--success) 26%, transparent);
+}
+
+.error {
+  color: var(--destructive);
+  background: color-mix(in oklch, var(--destructive) 8%, transparent);
+  border-color: color-mix(in oklch, var(--destructive) 25%, transparent);
+}
+
+.readonly {
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border-color: var(--border);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}

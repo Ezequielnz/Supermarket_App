@@ -1,0 +1,33 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.neutral {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.success {
+  background: color-mix(in oklch, var(--success) 15%, transparent);
+  color: color-mix(in oklch, var(--success) 75%, black);
+  border-color: color-mix(in oklch, var(--success) 30%, transparent);
+}
+
+.warning {
+  background: color-mix(in oklch, var(--warning) 20%, transparent);
+  color: color-mix(in oklch, var(--warning) 70%, black);
+  border-color: color-mix(in oklch, var(--warning) 35%, transparent);
+}
+
+.danger {
+  background: color-mix(in oklch, var(--destructive) 12%, transparent);
+  color: var(--destructive);
+  border-color: color-mix(in oklch, var(--destructive) 28%, transparent);
+}

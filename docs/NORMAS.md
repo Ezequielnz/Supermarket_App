@@ -2,6 +2,8 @@
 
 > Documento de referencia para desarrolladores y agentes de IA.  
 > Toda contribucion al proyecto DEBE respetar estas normas sin excepcion.
+>
+> En materia de seguridad, `SEGURIDAD.md` tiene precedencia sobre este documento.
 
 ---
 
@@ -26,10 +28,16 @@ Supermarket_App/
 ├── backend/              # FastAPI API
 └── docs/                 # Documentacion
     ├── ARQUITECTURA.md
-    └── NORMAS.md          # este archivo
+    ├── NORMAS.md          # este archivo
+    ├── SEGURIDAD.md
+    └── PLAN_CATALOGO_Y_CARRITO.md
 ```
 
-- **Nunca** mezclar codigo de `supermarket_front` con `supermarket_admin`.
+- **Nunca** mezclar codigo de `supermarket_front` con `supermarket_admin`. Son
+  dos productos distintos. Los archivos que coinciden (`api.js`,
+  `supabaseClient.js`, `ProtectedRoute.jsx`) estan **duplicados a proposito**:
+  duplicar es mas barato que un paquete compartido que acopla los dos ciclos de
+  release.
 - **Nunca** poner logica de negocio en el frontend; esta va en el backend.
 - **Nunca** hacer llamadas directas a Supabase desde el frontend; todas las operaciones pasan por el backend.
 
@@ -291,10 +299,23 @@ settings = Settings()
 
 - Nombres en **snake_case plural**: `shopping_lists`, `order_items`.
 - Toda tabla tiene `id UUID PRIMARY KEY DEFAULT gen_random_uuid()`.
-- Toda tabla principal tiene `created_at TIMESTAMPTZ DEFAULT NOW()`.
-- Las tablas de relacion (ej: `order_items`) tienen `updated_at` si sus filas se modifican.
+- Toda tabla principal tiene `created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`.
+- Las tablas cuyas filas se modifican tienen `updated_at`, mantenido por el
+  **trigger `set_updated_at`**, no a mano en cada UPDATE. Un `updated_at` que
+  depende de que alguien se acuerde de tocarlo miente tarde o temprano.
 - Los precios siempre en **centavos como INTEGER**. Nunca FLOAT o NUMERIC para dinero.
 - Las columnas de texto libre que sean criticas deben tener `NOT NULL`.
+- **Los conjuntos cerrados de valores van como `ENUM`**, no como TEXT libre. Si
+  un valor solo puede ser uno de N, la base lo tiene que saber.
+- **Todo dato con rango valido lleva `CHECK`**: precios y cantidades `> 0`,
+  fechas coherentes, formatos verificados. La validacion de Pydantic no protege
+  contra un INSERT que no venga de la API.
+- **Toda foreign key lleva su indice.** Postgres crea indices en las PK, no en
+  las FK, y esas son justamente las columnas por las que se filtra.
+- **Toda foreign key declara su `ON DELETE`** de forma explicita. Dejar el
+  default (`NO ACTION`) es no haber elegido: la migracion 019 existe porque un
+  `ON DELETE CASCADE` prometia una cascada que se frenaba tres tablas mas
+  abajo.
 
 ### 5.2 Migraciones
 
@@ -306,8 +327,16 @@ settings = Settings()
 
 - RLS debe estar habilitado en **todas** las tablas.
 - Un usuario consumidor solo puede leer/modificar sus propios datos.
-- Un staff de supermercado solo puede leer/modificar datos de su supermercado.
-- El backend (service_role) bypasea RLS cuando necesita acceso administrativo.
+- Un staff de supermercado solo puede leer datos de su cadena.
+- **El backend (service_role) bypasea RLS siempre, no "cuando lo necesita".**
+  Por eso RLS es defensa en profundidad y no la barrera principal: toda consulta
+  del backend a datos de un tenant lleva su filtro de ownership escrito a mano.
+  Ver SEGURIDAD.md §5.1 — es la regla que mas facil se olvida y la que mas caro
+  sale.
+- Una tabla con RLS y **cero policies** para `authenticated` es una decision
+  valida y frecuente: significa "solo el backend toca esto".
+- Toda funcion `SECURITY DEFINER` revoca `EXECUTE` de `PUBLIC`, `anon` **y**
+  `authenticated`. Los tres. Ver SEGURIDAD.md §5.3.
 
 ---
 
@@ -378,6 +407,10 @@ Tipos validos: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `test`
 - **No** eliminar tests existentes para hacer pasar un test nuevo.
 - **No** crear archivos fuera de la estructura definida en ARQUITECTURA.md sin justificacion documentada.
 - **No** instalar dependencias nuevas sin evaluar si ya existe algo equivalente en el proyecto.
+- **No** confiar en RLS para proteger una consulta del backend: `service_role` la ignora.
+- **No** tomar la identidad de un tenant (usuario o cadena) de un header, un
+  query param o el body. Sale del JWT y se resuelve contra la base.
+- **No** dejar una variable de entorno obligatoria que ningun codigo lee.
 
 ---
 
@@ -391,3 +424,7 @@ Tipos validos: `feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `test`
 - [ ] Los estilos usan variables CSS del design token, no valores hardcodeados.
 - [ ] Los elementos interactivos nuevos tienen `aria-label` si es necesario.
 - [ ] El codigo nuevo sigue las convenciones de nombrado de la seccion 3 y 4.
+- [ ] Las tablas nuevas tienen RLS, indices en sus FK y `ON DELETE` explicito.
+- [ ] Las funciones `SECURITY DEFINER` nuevas revocan `EXECUTE` de `PUBLIC`, `anon` y `authenticated`.
+- [ ] Se recorrio el checklist de `SEGURIDAD.md` §17 si el cambio toca backend,
+      base de datos o autenticacion.

@@ -1,0 +1,126 @@
+.page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 2rem 1.25rem;
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 520px;
+  padding: 2rem;
+  text-align: center;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 0.4rem;
+  border-radius: 50%;
+}
+
+.warning {
+  background: color-mix(in oklch, var(--warning) 18%, transparent);
+  color: color-mix(in oklch, var(--warning) 65%, black);
+}
+
+.danger {
+  background: color-mix(in oklch, var(--destructive) 12%, transparent);
+  color: var(--destructive);
+}
+
+.success {
+  background: color-mix(in oklch, var(--success) 14%, transparent);
+  color: color-mix(in oklch, var(--success) 72%, black);
+}
+
+.title {
+  font-size: clamp(1.3rem, 3.5vw, 1.6rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.body {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+  max-width: 46ch;
+}
+
+.reason {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  background: color-mix(in oklch, var(--destructive) 7%, transparent);
+  border: 1px solid color-mix(in oklch, var(--destructive) 22%, transparent);
+  border-radius: calc(var(--radius) - 0.35rem);
+}
+
+.reasonLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--destructive);
+}
+
+.reasonText {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: 0.5rem;
+  text-align: left;
+  background: var(--muted);
+  border-radius: calc(var(--radius) - 0.35rem);
+  padding: 0.4rem 1rem;
+}
+
+.details > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.details > div:last-child {
+  border-bottom: 0;
+}
+
+.details dt {
+  min-width: 120px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.details dd {
+  font-size: 0.87rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}

@@ -3,6 +3,7 @@ from uuid import UUID
 from app.core.supabase_client import get_supabase
 from app.schemas.shopping_list import CompareItemOut, CompareResponse, CompareResultOut
 from app.services.list_service import get_list_or_404
+from app.services.product_service import is_supermarket_visible
 
 
 def compare_list(list_id: UUID, user_id: UUID) -> CompareResponse:
@@ -14,6 +15,10 @@ def compare_list(list_id: UUID, user_id: UUID) -> CompareResponse:
     4. Si un supermercado no tiene algún producto (o está sin stock), marcarlo
        incompleto y omitir ese ítem de su detalle (nunca inventar un precio).
     5. Devolver resultados ordenados de menor a mayor total.
+
+    Solo entran supermercados activos de cadenas aprobadas: ver
+    is_supermarket_visible. El backend bypasea RLS, así que el filtro tiene que
+    estar acá aunque las policies de 015 digan lo mismo.
     """
     get_list_or_404(list_id, user_id)
     client = get_supabase()
@@ -34,7 +39,7 @@ def compare_list(list_id: UUID, user_id: UUID) -> CompareResponse:
 
     prices = (
         client.table("supermarket_products")
-        .select("*, supermarkets(*)")
+        .select("*, supermarkets(*, chains(status))")
         .in_("product_id", product_ids)
         .eq("in_stock", True)
         .execute()
@@ -43,6 +48,8 @@ def compare_list(list_id: UUID, user_id: UUID) -> CompareResponse:
     by_supermarket: dict[str, dict] = {}
     for row in prices:
         supermarket = row["supermarkets"]
+        if not is_supermarket_visible(supermarket):
+            continue
         entry = by_supermarket.setdefault(
             supermarket["id"],
             {"supermarket": supermarket, "currency": row["currency"], "items": []},

@@ -1,6 +1,9 @@
 # FreshMart — Arquitectura del Proyecto
 
-> **Versión:** 1.0 · **Fecha:** 2026-08-20
+> **Versión:** 2.0 · **Fecha:** 2026-08-21
+>
+> Ver también `NORMAS.md` (convenciones), `SEGURIDAD.md` (normativo en materia
+> de seguridad) y `PLAN_CATALOGO_Y_CARRITO.md` (plan del próximo sprint).
 
 ---
 
@@ -25,8 +28,10 @@ Supermarket_App/
 ├── supermarket_admin/     # Supermarket Dashboard (React + Vite)
 ├── backend/               # API REST (Python + FastAPI)
 └── docs/
-    ├── ARQUITECTURA.md    # este archivo
-    └── NORMAS.md
+    ├── ARQUITECTURA.md              # este archivo
+    ├── NORMAS.md
+    ├── SEGURIDAD.md
+    └── PLAN_CATALOGO_Y_CARRITO.md   # proximo sprint
 ```
 
 ---
@@ -42,7 +47,7 @@ React + Vite                    React + Vite
                  |        |
           FastAPI Backend
           api.freshmart.com
-          /auth /products /lists /orders /supermarkets
+          /auth /products /lists /orders /supermarkets /admin
                  |
           Supabase
           PostgreSQL + Auth
@@ -117,32 +122,64 @@ Identico a supermarket_front.
 
 ### 5.2 Estructura de Directorios
 
+Implementado (sprint de onboarding):
+
 ```
 supermarket_admin/src/
-├── App.jsx
-├── index.css
+├── App.jsx                     # hash-routing publico + HashRouter en /app
+├── index.css                   # design tokens; --primary azul (el consumidor es verde)
 ├── components/
 │   ├── Sidebar.jsx / .module.css
 │   ├── TopBar.jsx / .module.css
-│   └── ui/
+│   ├── ui/                     # Button, Input, Field, Badge
+│   └── shared/
+│       ├── ProtectedRoute.jsx  # exige sesion
+│       └── ApprovedRoute.jsx   # ademas exige chain.status === 'approved'
 ├── pages/
-│   ├── AuthPage.jsx              # /auth
+│   ├── LandingPage.jsx         # /          — publica
+│   ├── AuthPage.jsx            # /auth      — login
+│   ├── RegisterPage.jsx        # /register  — wizard de 4 pasos
+│   ├── PendingReviewPage.jsx   # /pending   — estado de la solicitud
 │   └── app/
-│       ├── OrdersPage.jsx        # /app/orders
-│       ├── OrderDetailPage.jsx   # /app/orders/:id
-│       ├── ProductsPage.jsx      # /app/products
-│       └── ProfilePage.jsx       # /app/profile
+│       ├── AppLayout.jsx       # sidebar + outlet
+│       ├── ProfilePage.jsx     # /app/profile
+│       ├── StoresPage.jsx      # /app/stores
+│       └── TeamPage.jsx        # /app/team   (solo owner)
 ├── hooks/
-│   ├── useAdminAuth.js
-│   └── useOrders.js
-└── services/
-    ├── api.js
-    ├── auth.service.js
-    ├── orders.service.js
-    └── products.service.js
+│   └── useAdminAuth.js
+├── services/
+│   ├── api.js                  # copia literal de supermarket_front (NORMAS §2)
+│   ├── supabaseClient.js       # idem
+│   ├── auth.service.js
+│   └── supermarket.service.js
+└── context/
+    └── AdminAuthContext.jsx
 ```
 
-### 5.3 Flujo del Supermercado
+Pendiente para el siguiente sprint: `OrdersPage`, `OrderDetailPage` y
+`ProductsPage`, mas la UI de moderacion de plataforma (hoy la aprobacion se
+hace por `POST /admin/chains/{id}/review`).
+
+### 5.3 Onboarding del Supermercado
+
+```
+[Landing /] → [Registro /register — wizard]
+                 1. Datos del responsable
+                 2. Datos de la cadena (razon social, CUIT)
+                 3. Primera sucursal + horarios
+                 4. Revision y envio
+                        |
+              [Confirmacion de correo]
+                        |
+              [Login] → chain.status ?
+                        |
+        ┌───────────────┼────────────────┐
+   pending_review    approved      rejected / suspended
+        |               |                 |
+   [/pending]      [/app/profile]    [/pending + motivo]
+```
+
+### 5.4 Flujo Operativo (siguiente sprint)
 
 ```
 [Login]
@@ -183,10 +220,9 @@ backend/
 │   │           ├── auth.py
 │   │           ├── products.py
 │   │           ├── lists.py
-│   │           ├── comparison.py
 │   │           ├── orders.py
-│   │           ├── tracking.py
-│   │           └── supermarkets.py
+│   │           ├── supermarkets.py     # onboarding y panel
+│   │           └── admin.py            # moderacion de plataforma
 │   ├── schemas/
 │   │   ├── auth.py
 │   │   ├── product.py
@@ -194,9 +230,14 @@ backend/
 │   │   ├── order.py
 │   │   └── supermarket.py
 │   └── services/
+│       ├── auth_service.py
+│       ├── product_service.py
+│       ├── list_service.py
 │       ├── comparison_service.py
 │       ├── order_service.py
-│       └── notification_service.py
+│       ├── supermarket_auth_service.py   # registro y moderacion
+│       └── supermarket_service.py        # perfil, sucursales, equipo
+├── migrations/                # SQL numerado, ver NORMAS.md §5.2
 ├── tests/
 ├── requirements.txt
 ├── requirements-dev.txt
@@ -211,8 +252,10 @@ backend/
 | Metodo | Ruta | Descripcion | Rol |
 |---|---|---|---|
 | POST | /auth/register | Registro consumidor | Publico |
-| POST | /auth/login | Login (delega a Supabase) | Publico |
-| POST | /auth/supermarket/login | Login del supermercado | Publico |
+
+> El login **no** tiene endpoint propio, ni el del consumidor ni el del
+> supermercado: va directo contra Supabase (`signInWithPassword`) desde cada
+> frontend. Es la excepcion explicita de NORMAS.md §2.
 
 #### Productos
 | Metodo | Ruta | Descripcion | Rol |
@@ -240,142 +283,127 @@ backend/
 | GET | /orders/{id} | Detalle + estado | Consumidor |
 | GET | /orders/{id}/status | Estado actual (polling) | Consumidor |
 
-#### Panel del Supermercado
+#### Onboarding y Panel del Supermercado
 | Metodo | Ruta | Descripcion | Rol |
 |---|---|---|---|
-| GET | /supermarkets/orders | Pedidos del super | Staff |
-| GET | /supermarkets/orders/{id} | Detalle del pedido | Staff |
-| PATCH | /supermarkets/orders/{id}/status | Cambiar estado | Staff |
-| GET | /supermarkets/products | Catalogo y precios | Staff |
-| PUT | /supermarkets/products/{id} | Actualizar precio | Staff |
+| POST | /supermarkets/register | Alta de una cadena | Publico |
+| GET | /supermarkets/me | Perfil de la cadena y estado de revision | Staff |
+| PATCH | /supermarkets/me | Editar perfil de la cadena | Owner |
+| GET | /supermarkets/me/stores | Sucursales | Staff |
+| POST | /supermarkets/me/stores | Agregar sucursal | Owner/Manager |
+| GET | /supermarkets/me/stores/{id} | Detalle con horarios | Staff |
+| PATCH | /supermarkets/me/stores/{id} | Editar sucursal y horarios | Owner/Manager |
+| GET | /supermarkets/me/users | Equipo de la cadena | Owner |
+| POST | /supermarkets/me/users | Invitar a un empleado | Owner |
+
+#### Moderacion de Plataforma
+| Metodo | Ruta | Descripcion | Rol |
+|---|---|---|---|
+| GET | /admin/chains?status= | Cola de solicitudes | Admin plataforma |
+| POST | /admin/chains/{id}/review | Aprobar / rechazar / suspender | Admin plataforma |
+
+#### Siguiente sprint (aun no implementados)
+| Metodo | Ruta | Descripcion | Rol |
+|---|---|---|---|
+| GET | /supermarkets/me/orders | Pedidos del super | Staff |
+| PATCH | /supermarkets/me/orders/{id}/status | Cambiar estado | Staff |
+| GET | /supermarkets/me/products | Catalogo y precios | Staff |
+| PUT | /supermarkets/me/products/{id} | Actualizar precio | Owner/Manager |
 
 ---
 
 ## 7. Base de Datos (Supabase / PostgreSQL)
 
-### 7.1 Tablas
+> **La fuente de verdad del esquema son las migraciones**, en
+> `backend/migrations/`. Esta seccion es el mapa y el porque; el DDL exacto no
+> se duplica aca para que no quede desactualizado.
 
-#### profiles — Datos adicionales del consumidor
-```sql
-CREATE TABLE profiles (
-  id         UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  full_name  TEXT,
-  phone      TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+### 7.1 Modelo
+
+```
+chains ──1:N──> supermarkets ──1:N──> store_hours
+   │                 │
+   │                 ├──1:N──> supermarket_products ──N:1──> products
+   │                 │              │
+   │                 │              └──> price_history
+   │                 │
+   │                 └──1:N──> orders ──1:N──> order_items
+   └──1:N──> supermarket_users        └──1:N──> order_status_log
+
+auth.users ──1:1──> profiles            (consumidor)
+auth.users ──1:1──> supermarket_users   (staff)
+auth.users ──1:1──> platform_admins     (operador de FreshMart)
 ```
 
-#### supermarkets
-```sql
-CREATE TABLE supermarkets (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       TEXT NOT NULL,
-  address    TEXT,
-  logo_url   TEXT,
-  is_active  BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+**`chains` es la empresa; `supermarkets` es el local.** "Carrefour" es una
+cadena; "Carrefour Rivadavia 1234" es un supermarket. Los precios y los pedidos
+cuelgan del local, que es donde el cliente retira.
+
+### 7.2 Tablas
+
+| Tabla | Rol | Migracion |
+|---|---|---|
+| `profiles` | Perfil del consumidor (1:1 con auth.users) | 001 |
+| `chains` | Cadena: razon social, CUIT, estado de verificacion | 010 |
+| `supermarkets` | Sucursal: direccion estructurada, geo | 003, 010 |
+| `store_hours` | Horarios por dia de cada sucursal | 010 |
+| `supermarket_users` | Staff, con su rol y su cadena | 012 |
+| `platform_admins` | Operadores de FreshMart | 013 |
+| `chain_verification_log` | Auditoria de aprobaciones y rechazos | 013 |
+| `products` | Catalogo global (con EAN para machear entre cadenas) | 003, 016 |
+| `supermarket_products` | Precio vigente por sucursal y producto | 003 |
+| `price_history` | Precios anteriores, por trigger | 016 |
+| `shopping_lists` / `shopping_list_items` | Listas del consumidor | 004 |
+| `orders` / `order_items` / `order_status_log` | Pedidos y su historial | 005 |
+
+### 7.3 Tipos enumerados
+
+Definidos en la migracion 008. Antes eran `TEXT` libre, sin nada que impidiera
+un `status = 'lsito'`.
+
+| Tipo | Valores |
+|---|---|
+| `order_status` | `pending`, `confirmed`, `preparing`, `ready`, `completed`, `cancelled` |
+| `chain_status` | `pending_review`, `approved`, `rejected`, `suspended` |
+| `staff_role` | `owner`, `manager`, `staff` |
+| `product_unit` | `kg`, `g`, `L`, `ml`, `un` |
+
+### 7.4 Reglas transversales
+
+- **Dinero en centavos como `INTEGER`**, nunca `FLOAT` (NORMAS.md §5.1), con
+  `CHECK (... > 0)`.
+- **`created_at` / `updated_at` en toda tabla principal**, con `updated_at`
+  mantenido por el trigger `set_updated_at` (009), no a mano.
+- **Todas las FK tienen indice**: Postgres no los crea solo (009).
+- **Toda FK declara su `ON DELETE`** de forma explicita (019). Los pedidos usan
+  `RESTRICT`: son comprobantes fiscales y no desaparecen porque el cliente se de
+  de baja. La baja de un consumidor se resuelve anonimizando (SEGURIDAD.md §12.5).
+- **`orders.order_number`**: numero corto y legible, ademas del UUID. Un UUID no
+  se canta en el mostrador.
+
+### 7.5 Estados de la cadena
+
+```
+pending_review ──> approved ──> suspended
+      │                ^            │
+      │                └────────────┘
+      └──> rejected ──> (corrige y reenvia)
 ```
 
-#### supermarket_users — Staff autorizado
-```sql
-CREATE TABLE supermarket_users (
-  id             UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  supermarket_id UUID NOT NULL REFERENCES supermarkets(id),
-  role           TEXT DEFAULT 'staff'  -- 'admin' | 'staff'
-);
-```
+| Estado | Significado | Visible en el comparador |
+|---|---|---|
+| `pending_review` | Registrada, esperando revision | No |
+| `approved` | Verificada, operativa | **Si** |
+| `rejected` | Rechazada, con motivo obligatorio | No |
+| `suspended` | Dada de baja temporalmente | No |
 
-#### products — Catalogo global
-```sql
-CREATE TABLE products (
-  id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name      TEXT NOT NULL,
-  brand     TEXT,
-  unit      TEXT,    -- 'kg' | 'L' | 'un' | 'g'
-  category  TEXT,
-  image_url TEXT
-);
-```
+**Solo las sucursales de cadenas `approved` entran al comparador.** Eso se
+aplica en dos lugares y los dos son necesarios: las policies de la migracion 015
+(para clientes que usen la anon key) y un filtro explicito en Python
+(`is_supermarket_visible` en `product_service.py`), porque el backend usa
+`service_role` y bypasea RLS. Ver SEGURIDAD.md §5.1.
 
-#### supermarket_products — Precio por supermercado
-```sql
-CREATE TABLE supermarket_products (
-  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  supermarket_id UUID NOT NULL REFERENCES supermarkets(id),
-  product_id     UUID NOT NULL REFERENCES products(id),
-  price          INTEGER NOT NULL,  -- centavos, evita float
-  currency       TEXT DEFAULT 'ARS',
-  in_stock       BOOLEAN DEFAULT TRUE,
-  updated_at     TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(supermarket_id, product_id)
-);
-```
-
-#### shopping_lists
-```sql
-CREATE TABLE shopping_lists (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name       TEXT NOT NULL DEFAULT 'Mi lista',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-#### shopping_list_items
-```sql
-CREATE TABLE shopping_list_items (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  list_id    UUID NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id),
-  quantity   NUMERIC(10,2) NOT NULL DEFAULT 1,
-  note       TEXT
-);
-```
-
-#### orders
-```sql
-CREATE TABLE orders (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id          UUID NOT NULL REFERENCES auth.users(id),
-  supermarket_id   UUID NOT NULL REFERENCES supermarkets(id),
-  list_id          UUID REFERENCES shopping_lists(id),
-  status           TEXT NOT NULL DEFAULT 'pending',
-  pickup_scheduled TIMESTAMPTZ NOT NULL,
-  total_price      INTEGER,
-  notes            TEXT,
-  created_at       TIMESTAMPTZ DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ DEFAULT NOW()
-);
--- status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed' | 'cancelled'
-```
-
-#### order_items
-```sql
-CREATE TABLE order_items (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id   UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL REFERENCES products(id),
-  quantity   NUMERIC(10,2) NOT NULL,
-  unit_price INTEGER NOT NULL,
-  subtotal   INTEGER NOT NULL
-);
-```
-
-#### order_status_log — Historial de cambios
-```sql
-CREATE TABLE order_status_log (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id   UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  status     TEXT NOT NULL,
-  changed_by UUID REFERENCES auth.users(id),
-  note       TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### 7.2 Estados del Pedido
+### 7.6 Estados del Pedido
 
 ```
 pending → confirmed → preparing → ready → completed
@@ -389,21 +417,59 @@ pending → confirmed → preparing → ready → completed
 | preparing | Supermercado | Armando la bolsa |
 | ready | Supermercado | Bolsa lista para retirar |
 | completed | Supermercado | Cliente retiro |
-| cancelled | Cualquiera | Pedido cancelado |
+| cancelled | Consumidor o supermercado | Pedido cancelado |
 
----
+### 7.7 Funciones RPC
+
+Toda escritura que toque varias tablas pasa por una funcion `SECURITY DEFINER`,
+para que sea atomica:
+
+| Funcion | Escribe en | Migracion |
+|---|---|---|
+| `create_order_with_items` | orders, order_items, order_status_log | 006 |
+| `cancel_order` | orders, order_status_log | 006 |
+| `register_supermarket_chain` | chains, supermarkets, store_hours, supermarket_users, chain_verification_log | 014 |
+| `review_chain` | chains, chain_verification_log | 014 |
+
+Todas revocan `EXECUTE` de `PUBLIC`, `anon` y `authenticated`, y lo otorgan solo
+a `service_role`. **Los tres roles, no dos**: Supabase otorga un grant directo a
+`anon` por default privileges que sobrevive al `REVOKE ... FROM PUBLIC`. Ver
+migracion 017 y SEGURIDAD.md §5.3.
 
 ## 8. Autenticacion
 
-- Supabase Auth maneja JWT para ambos tipos de usuario.
-- Usuario sin fila en supermarket_users → consumidor.
-- Usuario con fila en supermarket_users → staff del supermercado.
+- Supabase Auth maneja JWT para los tres tipos de usuario.
+- El backend verifica los tokens contra el **JWKS publico** del proyecto
+  (ES256/RS256), no con un secreto compartido. Por eso no existe `JWT_SECRET`.
+- El tipo de cuenta se deriva de la base, no del token:
+
+| Ubicacion de la fila | Tipo de cuenta | Dependencia FastAPI |
+|---|---|---|
+| Ninguna tabla especial | Consumidor | `get_current_user` |
+| `supermarket_users` | Staff de supermercado | `get_current_staff` |
+| `platform_admins` | Admin de plataforma | `get_current_platform_admin` |
 
 ```
-Consumidor:     Authorization: Bearer <jwt>
-Supermercado:   Authorization: Bearer <jwt>
-                X-Supermarket-ID: <supermarket_uuid>
+Todos:  Authorization: Bearer <jwt>
 ```
+
+> **Cambio respecto de la version 1.0.** Esta ya no propone el header
+> `X-Supermarket-ID: <uuid>`. Un identificador de tenant que elige el cliente
+> es una escalada horizontal directa: el staff de la cadena A manda el UUID de
+> la B y opera sobre datos ajenos. La pertenencia se resuelve consultando
+> `supermarket_users` por el `sub` del JWT. Ver `SEGURIDAD.md` §4.1.
+
+El alta de una cuenta de staff pasa `account_type: supermarket_staff` en el
+`user_metadata`, lo que hace que el trigger `handle_new_user` **no** le cree
+una fila en `profiles`: un usuario es consumidor XOR staff, nunca las dos cosas.
+
+### 8.1 Roles del staff
+
+| Rol | Puede |
+|---|---|
+| `owner` | Perfil fiscal de la cadena, sucursales, equipo. Uno solo por cadena. |
+| `manager` | Sucursales y catalogo de su cadena. |
+| `staff` | Operar pedidos. Solo lectura del resto. |
 
 ---
 
@@ -413,9 +479,13 @@ Supermercado:   Authorization: Bearer <jwt>
 
 1. Obtener todos los shopping_list_items de la lista.
 2. Para cada product_id, consultar supermarket_products.
-3. Agrupar por supermercado y sumar totales.
-4. Si un supermercado no tiene algun producto → marcarlo incompleto.
-5. Devolver resultados ordenados de menor a mayor.
+3. **Descartar los supermercados inactivos y los de cadenas no aprobadas**
+   (`is_supermarket_visible`). Sin este paso, una cadena en revision apareceria
+   en el comparador apenas cargue precios: el backend usa `service_role` y las
+   policies de la migracion 015 no lo alcanzan.
+4. Agrupar por supermercado y sumar totales.
+5. Si un supermercado no tiene algun producto → marcarlo incompleto.
+6. Devolver resultados ordenados de menor a mayor.
 
 **Respuesta:**
 ```json
@@ -445,16 +515,24 @@ Supermercado:   Authorization: Bearer <jwt>
 SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
-JWT_SECRET=...
 ALLOWED_ORIGINS=https://app.freshmart.com,https://admin.freshmart.com
 ```
 
-### Frontend (.env.local)
+> Ya **no** hay `JWT_SECRET`: la verificacion va contra el JWKS publico
+> (§8), asi que era un secreto obligatorio que ningun codigo leia — riesgo de
+> filtracion sin contrapartida. Ver SEGURIDAD.md §6.2 y D2 en §16.
+
+Plantilla en `backend/.env.example`.
+
+### Frontend (.env.local) — igual en los dos frontends
 ```
 VITE_API_BASE_URL=https://api.freshmart.com/api/v1
 VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=...
 ```
+
+En local: `supermarket_front` corre en el puerto **5173** y `supermarket_admin`
+en el **5174**. Los dos tienen que estar en `ALLOWED_ORIGINS` del backend.
 
 ---
 

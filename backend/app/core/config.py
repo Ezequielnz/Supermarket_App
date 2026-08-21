@@ -8,7 +8,10 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_ANON_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str
-    JWT_SECRET: str
+    # No hay JWT_SECRET: la verificación de tokens va contra el JWKS público del
+    # proyecto (ver core/security.py), no con un secreto compartido. Tenerlo
+    # declarado obligaba a cargar en el .env un secreto que nada leía — puro
+    # riesgo de filtración sin contrapartida. Ver docs/SEGURIDAD.md §6.2.
     # NoDecode: sin esto, pydantic-settings intenta interpretar el valor del .env
     # como JSON antes de llegar al validator (falla porque ALLOWED_ORIGINS es un
     # CSV plano, no una lista JSON).

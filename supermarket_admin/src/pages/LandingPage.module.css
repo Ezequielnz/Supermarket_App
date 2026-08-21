@@ -1,0 +1,206 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.5rem;
+  padding-left: max(1.5rem, env(safe-area-inset-left));
+  padding-right: max(1.5rem, env(safe-area-inset-right));
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.brandMark {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.brandSub {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.navLink {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.navLink:hover {
+  color: var(--foreground);
+}
+
+.navCta {
+  padding: 0.55rem 1rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  border-radius: calc(var(--radius) - 0.35rem);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.navCta:hover {
+  background: color-mix(in oklch, var(--primary) 88%, black);
+}
+
+.hero {
+  padding: clamp(3rem, 9vw, 6rem) 0;
+  text-align: center;
+}
+
+.heroTitle {
+  margin-top: 0.6rem;
+  font-size: clamp(2rem, 6vw, 3.6rem);
+  font-weight: 900;
+  line-height: 1.06;
+  letter-spacing: -0.035em;
+}
+
+.heroText {
+  max-width: 56ch;
+  margin: 1.1rem auto 0;
+  font-size: clamp(0.95rem, 1.6vw, 1.08rem);
+  line-height: 1.65;
+  color: var(--muted-foreground);
+}
+
+.heroCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.75rem;
+  padding: 0.85rem 1.5rem;
+  font-size: 0.98rem;
+  font-weight: 700;
+  border-radius: calc(var(--radius) - 0.25rem);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.heroCta:hover {
+  background: color-mix(in oklch, var(--primary) 88%, black);
+}
+
+.heroNote {
+  margin-top: 0.8rem;
+  font-size: 0.82rem;
+  color: var(--muted-foreground);
+}
+
+.section {
+  padding: clamp(2.5rem, 6vw, 4.5rem) 0;
+}
+
+.sectionMuted {
+  background: var(--muted);
+}
+
+.sectionTitle {
+  margin-bottom: 1.75rem;
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+  gap: 1.25rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.cardIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+.cardTitle {
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.cardText {
+  font-size: 0.89rem;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+  gap: 1.25rem;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  gap: 0.9rem;
+}
+
+.stepNumber {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.stepTitle {
+  margin-bottom: 0.3rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.footer {
+  margin-top: auto;
+  padding: 1.5rem 0;
+  font-size: 0.82rem;
+  color: var(--muted-foreground);
+  border-top: 1px solid var(--border);
+}

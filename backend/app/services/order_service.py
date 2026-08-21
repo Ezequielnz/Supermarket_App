@@ -13,6 +13,7 @@ from app.schemas.order import (
     OrderStatusResponse,
 )
 from app.services.list_service import get_list_or_404
+from app.services.product_service import is_supermarket_visible
 
 
 def get_order_or_404(order_id: UUID, user_id: UUID) -> dict:
@@ -40,15 +41,18 @@ def create_order(payload: OrderCreate, user_id: UUID) -> OrderResponse:
 
     get_list_or_404(payload.list_id, user_id)
 
+    # No alcanza con is_active: además la cadena tiene que estar aprobada. Sin
+    # esto, un supermercado en revisión (o suspendido) seguiría aceptando
+    # pedidos, porque el backend bypasea las policies de 015.
     supermarket = (
         client.table("supermarkets")
-        .select("*")
+        .select("*, chains(status)")
         .eq("id", str(payload.supermarket_id))
         .eq("is_active", True)
         .maybe_single()
         .execute()
     )
-    if supermarket.data is None:
+    if supermarket is None or supermarket.data is None or not is_supermarket_visible(supermarket.data):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Supermercado no encontrado.")
 
     list_items = (
