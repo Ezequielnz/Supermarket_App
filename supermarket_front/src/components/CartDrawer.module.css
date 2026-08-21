@@ -1,0 +1,193 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  cursor: default;
+  background: color-mix(in oklch, var(--foreground) 20%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.drawer {
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  max-width: 28rem;
+  background: var(--card);
+  padding: 1.5rem;
+  box-shadow: -20px 0 60px rgba(18, 18, 18, 0.12);
+  animation: slideIn 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@media (min-width: 640px) {
+  .drawer { padding: 2rem; }
+}
+
+.drawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drawerTitle {
+  margin-top: 0.5rem;
+  font-size: 1.875rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.closeBtn {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--secondary);
+  transition: background 200ms;
+}
+
+.closeBtn:hover { background: var(--border); }
+
+.items {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 2rem 0;
+}
+
+.empty {
+  margin: auto;
+  text-align: center;
+}
+
+.emptyIcon { font-size: 3.75rem; }
+
+.emptyTitle {
+  margin-top: 1.25rem;
+  font-weight: 700;
+}
+
+.emptyText {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  background: var(--secondary);
+  padding: 0.75rem;
+}
+
+.itemEmoji {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  font-size: 1.75rem;
+  flex-shrink: 0;
+}
+
+.itemInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemName {
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemPrice {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.qtyControl {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: var(--card);
+  padding: 0.25rem 0.5rem;
+}
+
+.qtyControl button {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  transition: background 150ms;
+}
+
+.qtyControl button:hover { background: var(--secondary); }
+
+.qtyControl span {
+  min-width: 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.footer {
+  border-top: 1px solid var(--border);
+  padding-top: 1.25rem;
+}
+
+.subtotal {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 900;
+}
+
+.checkoutBtn {
+  margin-top: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  border-radius: 0.75rem;
+  background: var(--primary);
+  padding: 1rem;
+  font-weight: 700;
+  color: var(--primary-foreground);
+  transition: opacity 200ms, transform 200ms;
+}
+
+.checkoutBtn:hover:not(:disabled) { transform: scale(1.01); }
+
+.checkoutBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}

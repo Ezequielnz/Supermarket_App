@@ -1,0 +1,110 @@
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.backLink:hover { color: var(--foreground); }
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.muted { color: var(--muted-foreground); font-size: 0.9375rem; }
+
+.errorText {
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--destructive) 12%, var(--card));
+  border: 1.5px solid color-mix(in oklch, var(--destructive) 35%, transparent);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--destructive);
+  max-width: 480px;
+  margin: 2rem auto;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  border-radius: 9999px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+}
+
+.statusBadge[data-status="ready"],
+.statusBadge[data-status="completed"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.statusBadge[data-status="cancelled"] {
+  background: color-mix(in oklch, var(--destructive) 15%, var(--card));
+  color: var(--destructive);
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem 1rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  padding: 1rem 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.summary span { color: var(--muted-foreground); }
+.summary strong { text-align: right; }
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 0.75rem;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+}
+
+.cancelBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--destructive);
+  color: var(--destructive);
+  padding: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  transition: background 200ms;
+}
+
+.cancelBtn:hover { background: color-mix(in oklch, var(--destructive) 10%, transparent); }
+.cancelBtn:disabled { opacity: 0.6; cursor: not-allowed; }
