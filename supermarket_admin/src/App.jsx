@@ -8,6 +8,7 @@ import PendingReviewPage from './pages/PendingReviewPage'
 import AppLayout from './pages/app/AppLayout'
 import ProfilePage from './pages/app/ProfilePage'
 import StoresPage from './pages/app/StoresPage'
+import ProductsPage from './pages/app/ProductsPage'
 import TeamPage from './pages/app/TeamPage'
 import ProtectedRoute from './components/shared/ProtectedRoute'
 import ApprovedRoute from './components/shared/ApprovedRoute'
@@ -42,6 +43,7 @@ export default function App() {
                   <Route path="/app" element={<Navigate to="/app/profile" replace />} />
                   <Route path="/app/profile" element={<ProfilePage />} />
                   <Route path="/app/stores" element={<StoresPage />} />
+                  <Route path="/app/products" element={<ProductsPage />} />
                   <Route path="/app/team" element={<TeamPage />} />
                 </Route>
               </Route>

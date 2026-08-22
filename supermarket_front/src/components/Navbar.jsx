@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import styles from './Navbar.module.css'
 
-export default function Navbar({ cartCount, onCartOpen }) {
+// Solo para la landing publica. El carrito vive en /app, detras del login, y
+// tiene su propia barra (AppNav): esta recibia cartCount y onCartOpen y no
+// usaba ninguno de los dos.
+export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
 
   function goAuth(e) {

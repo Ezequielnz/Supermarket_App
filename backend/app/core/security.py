@@ -131,6 +131,27 @@ def require_approved_chain(
     return current_staff
 
 
+def require_approved_manager(
+    current_staff: CurrentStaff = Depends(require_approved_chain),
+) -> CurrentStaff:
+    """
+    Cadena aprobada Y rol de encargado o responsable. Es la combinación que
+    exige toda escritura del catálogo: publicar precios es operar (de ahí lo
+    aprobado) y la matriz de docs/SEGURIDAD.md §4.2 le da al rol 'staff' solo
+    lectura sobre los precios de su cadena.
+
+    Va como dependencia propia y no anidando require_manager dentro de
+    require_approved_chain porque FastAPI resuelve cada dependencia por
+    separado: encadenarlas a mano es lo que garantiza que se evalúen las dos.
+    """
+    if current_staff.role not in MANAGER_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requiere rol de encargado o responsable.",
+        )
+    return current_staff
+
+
 def get_current_platform_admin(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> CurrentPlatformAdmin:

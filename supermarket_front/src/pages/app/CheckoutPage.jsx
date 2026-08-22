@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ShoppingBag } from 'lucide-react'
 
+import { formatPrice } from '../../lib/money'
 import { createOrder } from '../../services/orders.service'
 import styles from './CheckoutPage.module.css'
 
@@ -52,7 +53,7 @@ export default function CheckoutPage() {
         <span>Supermercado</span>
         <strong>{supermarketName}</strong>
         <span>Total estimado</span>
-        <strong>${estimatedTotal?.toFixed?.(2) ?? estimatedTotal}</strong>
+        <strong>{formatPrice(estimatedTotal)}</strong>
       </div>
       <p className={styles.note}>
         El total final se recalcula al confirmar, según el stock disponible en el momento.

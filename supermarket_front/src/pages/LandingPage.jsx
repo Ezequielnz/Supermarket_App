@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Search, ArrowRight, BarChart2, ListChecks, ShoppingBag, RefreshCw, ChevronRight, Check } from 'lucide-react'
+import { Search, ArrowRight, BarChart2, ListChecks, ShoppingBag, RefreshCw, ChevronRight } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import styles from './LandingPage.module.css'
 
@@ -52,16 +51,9 @@ const STEPS = [
 ]
 
 export default function LandingPage() {
-  const [notice, setNotice] = useState('')
-
-  const showNotice = (msg) => {
-    setNotice(msg)
-    setTimeout(() => setNotice(''), 2000)
-  }
-
   return (
     <main className={styles.main}>
-      <Navbar cartCount={0} onCartOpen={() => showNotice('Inicia sesión para ver tu lista guardada')} />
+      <Navbar />
 
       {/* ── Hero ── */}
       <section id="inicio" className={styles.hero}>
@@ -296,13 +288,6 @@ export default function LandingPage() {
           Tu comparador de supermercados · © 2026
         </p>
       </footer>
-
-      {/* ── Toast ── */}
-      {notice && (
-        <div className={styles.toast}>
-          <Check size={16} /> {notice}
-        </div>
-      )}
     </main>
   )
 }

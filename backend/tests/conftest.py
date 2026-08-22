@@ -41,7 +41,7 @@ def chain_mock(execute_result):
     mock = MagicMock()
     chainable = [
         "select", "insert", "update", "delete", "eq", "neq", "in_", "ilike",
-        "order", "range", "limit", "filter",
+        "order", "range", "limit", "filter", "is_",
     ]
     for method in chainable:
         getattr(mock, method).return_value = mock
@@ -51,7 +51,17 @@ def chain_mock(execute_result):
         mock.execute.return_value = execute_result
     mock.maybe_single.return_value = mock
     mock.single.return_value = mock
+    # `.not_` es una propiedad en postgrest-py, no un metodo: se usa como
+    # `.not_.is_("category", "null")`.
+    mock.not_ = mock
     return mock
+
+
+# `.maybe_single().execute()` devuelve None —la respuesta entera, no un objeto
+# con .data = None— cuando no hay fila. Los tests tienen que simular eso y no
+# FakeResult(data=None), o dejan pasar el AttributeError que en produccion sale
+# como 500 en vez de 404. Ver core/supabase_client.single_row.
+NO_ROW = None
 
 
 def table_router(tables: dict):

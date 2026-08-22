@@ -1,0 +1,134 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.brandMark {
+  color: var(--ring);
+}
+
+.nav {
+  display: flex;
+  gap: 0.25rem;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  border-radius: 999px;
+}
+
+.link:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.linkActive {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.linkActive:hover {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+/* En pantallas angostas queda el icono solo: tres etiquetas mas el carrito no
+   entran, y esconder la navegacion entera es peor que abreviarla. */
+@media (max-width: 560px) {
+  .linkLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .link {
+    padding: 0.5rem 0.7rem;
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.cartBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.cartBtn:hover {
+  background: var(--secondary);
+}
+
+.badge {
+  position: absolute;
+  top: -0.2rem;
+  right: -0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border: 2px solid var(--background);
+  border-radius: 999px;
+}
+
+.logoutBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  color: var(--muted-foreground);
+  border-radius: 999px;
+}
+
+.logoutBtn:hover {
+  color: var(--foreground);
+  background: var(--secondary);
+}

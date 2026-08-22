@@ -541,6 +541,13 @@ Además, CAPTCHA en ambos formularios de registro.
 
 `GET /products`, `GET /products/{id}/prices` y `GET /lists/{id}/compare` exponen, sumados, la base de precios completa. Son el activo que nos confían los supermercados (§2.2).
 
+> **`GET /products` aumentó su exposición** al empezar a devolver `best_price`,
+> `best_price_supermarket` y `available_in`: una sola página de 100 productos
+> ahora entrega el mejor precio de cada uno y quién lo tiene. La autenticación
+> sigue siendo obligatoria y `per_page` sigue topeado en 100, pero **falta el
+> límite por usuario** — ver D4, que con este cambio pasa a ser más urgente, no
+> menos.
+
 - Requieren autenticación **siempre**. Ningún precio se sirve a un usuario anónimo.
 - Límite por usuario autenticado: 100 req/min en catálogo, 30 req/min en comparación.
 - `per_page` con tope duro (`le=100`, ya aplicado en los endpoints existentes).
@@ -665,6 +672,12 @@ Hallazgos abiertos al 2026-08-21. Cada uno con su ubicación exacta.
 | D9 | Sin endpoint de exportación ni de borrado de datos personales (§12.4). | Backend | Media | Abierto |
 | D10 | `create_order_with_items` y `cancel_order` tenían `EXECUTE` para `anon`: se podían invocar por PostgREST **sin JWT**, solo con la anon key, pasando cualquier `p_user_id`. Falsificación de pedidos a nombre de otro usuario. | `006_create_order_rpc.sql` | **Crítica** | **Corregido** en `017_revoke_anon_execute.sql` |
 | D11 | Protección contra contraseñas filtradas desactivada en Supabase Auth: se aceptan contraseñas que ya aparecieron en brechas conocidas. | Panel de Supabase → Authentication | Media | Abierto — es un toggle, no requiere código |
+| D12 | `get_list_or_404` devolvía **500 en vez de 404** para una lista de otro usuario: `.maybe_single()` de postgrest-py devuelve `None`, no un objeto con `.data = None`, así que `result.data` era un `AttributeError`. Un 500 donde va un 404 filtra que la ruta existe y contradice §4.3. El test que lo cubría pasaba porque su mock no imitaba a la librería. | `app/services/list_service.py` | Media | **Corregido** — `core/supabase_client.single_row()` normaliza el caso; los tests usan `NO_ROW` |
+
+D12 es del mismo tipo que D10: los dos se detectaron al contrastar el código
+contra el comportamiento **real** —la base en un caso, la librería en el otro— y
+en los dos el test que debía cubrirlo pasaba igual. Un mock que no imita a la
+dependencia no prueba nada; solo confirma que el mock hace lo que el mock hace.
 
 D10 se detectó al verificar las ACL contra la base real durante este sprint, y
 ya está cerrado. Es el ejemplo de por qué §5.4 pide correr esa consulta en cada

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Store, Building2, Users, LogOut } from 'lucide-react'
+import { Store, Building2, Users, Package, LogOut } from 'lucide-react'
 
 import { useAdminAuth } from '../hooks/useAdminAuth'
 import styles from './Sidebar.module.css'
@@ -7,6 +7,10 @@ import styles from './Sidebar.module.css'
 const NAV_ITEMS = [
   { to: '/app/profile', label: 'Mi cadena', icon: Building2 },
   { to: '/app/stores', label: 'Sucursales', icon: Store },
+  // Sin ownerOnly: el rol 'staff' ve los precios de su cadena, solo que no los
+  // edita (matriz de docs/SEGURIDAD.md §4.2). El filtro de escritura esta
+  // dentro de la pagina, no en la navegacion.
+  { to: '/app/products', label: 'Productos', icon: Package },
   { to: '/app/team', label: 'Equipo', icon: Users, ownerOnly: true },
 ]
 

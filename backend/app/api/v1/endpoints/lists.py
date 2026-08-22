@@ -5,11 +5,13 @@ from fastapi import APIRouter, Depends, Query, status
 from app.core.security import get_current_user
 from app.schemas.auth import CurrentUser
 from app.schemas.shopping_list import (
+    CartSaveRequest,
     CompareResponse,
     ShoppingListCreate,
     ShoppingListDetailOut,
     ShoppingListItemCreate,
     ShoppingListItemOut,
+    ShoppingListItemUpdate,
     ShoppingListListResponse,
     ShoppingListOut,
     ShoppingListUpdate,
@@ -35,6 +37,39 @@ def create_list(payload: ShoppingListCreate, current_user: CurrentUser = Depends
     return list_service.create_list(payload, current_user.id)
 
 
+# ── Carrito ───────────────────────────────────────────────────────────────
+# Estas rutas van declaradas ANTES de /lists/{list_id}: FastAPI resuelve por
+# orden de registro, así que con /lists/{list_id} primero intentaría parsear
+# "cart" como UUID y devolvería 422 en vez de entrar acá.
+
+
+@router.get("/cart", response_model=ShoppingListDetailOut)
+def get_cart(current_user: CurrentUser = Depends(get_current_user)):
+    """Devuelve el carrito activo con sus items. Lo crea vacío si no existe."""
+    return list_service.get_cart(current_user.id)
+
+
+@router.post("/cart/items", response_model=ShoppingListItemOut, status_code=status.HTTP_201_CREATED)
+def add_cart_item(
+    payload: ShoppingListItemCreate,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Agrega un producto al carrito activo, sin tener que conocer su id."""
+    return list_service.add_cart_item(payload, current_user.id)
+
+
+@router.post("/cart/save", response_model=ShoppingListOut)
+def save_cart(
+    payload: CartSaveRequest = CartSaveRequest(),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Convierte el carrito activo en una lista guardada. El próximo producto que
+    se agregue abre un carrito nuevo y vacío.
+    """
+    return list_service.save_cart(payload, current_user.id)
+
+
 @router.get("/{list_id}", response_model=ShoppingListDetailOut)
 def get_list(list_id: UUID, current_user: CurrentUser = Depends(get_current_user)):
     """Devuelve el detalle de una lista propia, con sus productos."""
@@ -57,6 +92,20 @@ def delete_list(list_id: UUID, current_user: CurrentUser = Depends(get_current_u
 def add_item(list_id: UUID, payload: ShoppingListItemCreate, current_user: CurrentUser = Depends(get_current_user)):
     """Agrega un producto a una lista propia."""
     return list_service.add_item(list_id, payload, current_user.id)
+
+
+@router.patch("/{list_id}/items/{item_id}", response_model=ShoppingListItemOut)
+def set_item_quantity(
+    list_id: UUID,
+    item_id: UUID,
+    payload: ShoppingListItemUpdate,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Fija la cantidad de un producto de una lista propia. Es el control - / +
+    del carrito: fija, no suma. Para sacar el ítem está DELETE.
+    """
+    return list_service.set_item_quantity(list_id, item_id, payload, current_user.id)
 
 
 @router.delete("/{list_id}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

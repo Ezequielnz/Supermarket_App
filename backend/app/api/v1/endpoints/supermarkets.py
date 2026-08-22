@@ -2,8 +2,21 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.core.security import get_current_staff, require_manager, require_owner
+from app.core.security import (
+    get_current_staff,
+    require_approved_chain,
+    require_approved_manager,
+    require_manager,
+    require_owner,
+)
 from app.schemas.auth import CurrentStaff
+from app.schemas.catalog import (
+    ProductLookupResponse,
+    SupermarketProductCreate,
+    SupermarketProductListResponse,
+    SupermarketProductOut,
+    SupermarketProductUpdate,
+)
 from app.schemas.supermarket import (
     ChainProfileResponse,
     ChainOut,
@@ -18,7 +31,11 @@ from app.schemas.supermarket import (
     SupermarketRegisterRequest,
     SupermarketRegisterResponse,
 )
-from app.services import supermarket_auth_service, supermarket_service
+from app.services import (
+    supermarket_auth_service,
+    supermarket_product_service,
+    supermarket_service,
+)
 
 router = APIRouter(prefix="/supermarkets", tags=["supermarkets"])
 
@@ -123,3 +140,88 @@ def invite_my_staff(
     asignable: hay uno solo por cadena y se define en el registro.
     """
     return supermarket_service.invite_staff(payload, current_staff.chain_id)
+
+
+# ── Catálogo y precios ────────────────────────────────────────────────────
+# Los primeros endpoints que usan `require_approved_chain`: publicar precios es
+# operar, y una cadena en revisión, rechazada o suspendida no opera
+# (docs/SEGURIDAD.md §4.2). Leer el catálogo propio lo puede hacer cualquier
+# staff; escribirlo, solo owner o manager — igual que las sucursales.
+
+
+@router.get("/me/products", response_model=SupermarketProductListResponse)
+def get_my_products(
+    supermarket_id: UUID | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=120),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    current_staff: CurrentStaff = Depends(require_approved_chain),
+):
+    """
+    Catálogo propio con precios, paginado. Filtrable por sucursal (`supermarket_id`)
+    y por nombre (`q`). Solo devuelve precios de sucursales de la propia cadena.
+    """
+    return supermarket_product_service.list_my_products(
+        current_staff.chain_id, supermarket_id, q, page, per_page
+    )
+
+
+@router.get("/me/products/lookup", response_model=ProductLookupResponse)
+def lookup_catalog_product(
+    ean: str | None = Query(default=None, max_length=14),
+    q: str | None = Query(default=None, max_length=120),
+    supermarket_id: UUID | None = Query(default=None),
+    current_staff: CurrentStaff = Depends(require_approved_chain),
+):
+    """
+    Busca en el catálogo global antes de crear un producto: por EAN (identidad
+    exacta) o por nombre (candidatos a elegir a mano). Es el paso que evita que
+    cada cadena duplique el mismo producto y vacíe el comparador.
+    """
+    return supermarket_product_service.lookup(
+        current_staff.chain_id, supermarket_id, ean, q
+    )
+
+
+@router.post(
+    "/me/products",
+    response_model=SupermarketProductOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_my_product(
+    payload: SupermarketProductCreate,
+    current_staff: CurrentStaff = Depends(require_approved_manager),
+):
+    """
+    Empieza a vender un producto en una sucursal propia: resuelve el producto
+    del catálogo global (por EAN, o creándolo) y carga el precio.
+    Requiere rol de encargado o responsable, y cadena aprobada.
+    """
+    return supermarket_product_service.add_product(payload, current_staff.chain_id)
+
+
+@router.patch("/me/products/{listing_id}", response_model=SupermarketProductOut)
+def update_my_product(
+    listing_id: UUID,
+    payload: SupermarketProductUpdate,
+    current_staff: CurrentStaff = Depends(require_approved_manager),
+):
+    """
+    Cambia el precio o el stock de un producto propio. `listing_id` es el id de
+    la fila de `supermarket_products` (el precio), no el del producto global.
+    """
+    return supermarket_product_service.update_product(
+        listing_id, payload, current_staff.chain_id
+    )
+
+
+@router.delete("/me/products/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_product(
+    listing_id: UUID,
+    current_staff: CurrentStaff = Depends(require_approved_manager),
+):
+    """
+    Deja de vender ese producto en esa sucursal. Borra la fila de precio; el
+    producto del catálogo global no se toca, porque es compartido.
+    """
+    supermarket_product_service.remove_product(listing_id, current_staff.chain_id)

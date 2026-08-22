@@ -1,5 +1,6 @@
 import { ListChecks, LogOut } from 'lucide-react'
 
+import AppNav from '../../components/AppNav'
 import { useAuth } from '../../hooks/useAuth'
 import { useLists } from '../../hooks/useLists'
 import styles from './DashboardPage.module.css'
@@ -16,6 +17,7 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.page}>
+      <AppNav />
       <div className={styles.header}>
         <p className={styles.greeting}>
           Hola, {user?.user_metadata?.full_name || user?.email}

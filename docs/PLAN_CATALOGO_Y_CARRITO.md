@@ -1,10 +1,15 @@
 # FreshMart — Plan: carga de productos y carrito
 
-> **Versión:** 1.0 · **Fecha:** 2026-08-21
+> **Versión:** 2.0 · **Fecha:** 2026-08-22 · **Estado: IMPLEMENTADO**
 >
 > Plan de trabajo para el sprint que sigue al onboarding de supermercados.
 > Complementa `ARQUITECTURA.md`; las reglas de `NORMAS.md` y `SEGURIDAD.md`
 > aplican sin excepción.
+>
+> La v2.0 registra lo que se implementó y **en qué se corrigió el plan** al
+> chocar contra el código y la base reales. Los desvíos están en §11; no se
+> reescribió el cuerpo del documento para que se pueda ver qué se planeó y qué
+> terminó pasando.
 
 ---
 
@@ -81,7 +86,9 @@ por el comparador, al final.
 
 ## 3. Estado del que se parte
 
-Verificado sobre el código y la base al 2026-08-21.
+Verificado sobre el código y la base al 2026-08-21. **Esta tabla describe el
+punto de partida, no el estado actual**: todo lo que dice "no existe" o "está
+roto" se resolvió en este sprint (ver §7 y §12).
 
 | Pieza | Estado |
 |---|---|
@@ -94,6 +101,8 @@ Verificado sobre el código y la base al 2026-08-21.
 | `Navbar` | Recibe `cartCount` y `onCartOpen` y no usa ninguno (lo marca el linter) |
 | Panel del supermercado | Tiene perfil, sucursales y equipo. Falta la sección de productos |
 | `require_approved_chain` | Implementada en `core/security.py`, **todavía sin usar** por ningún endpoint |
+| `get_list_or_404` | Devolvía **500 en vez de 404** para una lista ajena: `.maybe_single()` devuelve `None`, no un objeto con `.data = None` (ver §11.4) |
+| Precios del seed | Cargados en **pesos** dentro de una columna de centavos, y el front hacía `.toFixed(2)` encima (ver §11.1) |
 
 ---
 
@@ -434,16 +443,19 @@ Ruta nueva en `App.jsx`: `/app/explore`.
 
 Cada fila deja el sistema funcionando; se puede parar en cualquiera.
 
-| # | Bloque | Depende de | Se verifica con |
-|---|---|---|---|
-| 1 | Fase 0: suma de cantidades + `PATCH` de ítem | — | `pytest` |
-| 2 | Fase 0: migración 020 + `/lists/cart` | 1 | `pytest` + curl |
-| 3 | Migración 021 + `catalog_service` + endpoints de productos del super | 2 | `pytest` + curl |
-| 4 | Panel: `ProductsPage` + modal de alta | 3 | Cargar 5 productos a mano |
-| 5 | `GET /products` con precios + `/products/categories` | 3 | curl |
-| 6 | Consumidor: `ExplorePage` | 5 | Ver los 5 productos del paso 4 |
-| 7 | Consumidor: `CartDrawer` + `CartContext` + `AppNav` | 2, 6 | Agregar y comparar |
-| 8 | Actualizar `ARQUITECTURA.md` §5, §6, §7 y este documento | todo | Lectura |
+| # | Bloque | Depende de | Se verifica con | Estado |
+|---|---|---|---|---|
+| 1 | Fase 0: suma de cantidades + `PATCH` de ítem | — | `pytest` | ✅ |
+| 2 | Fase 0: migración 020 + `/lists/cart` | 1 | `pytest` + curl | ✅ |
+| 3 | Migración 021 + `catalog_service` + endpoints de productos del super | 2 | `pytest` + curl | ✅ |
+| 4 | Panel: `ProductsPage` + modal de alta | 3 | Cargar 5 productos a mano | ✅ |
+| 5 | `GET /products` con precios + `/products/categories` | 3 | curl | ✅ |
+| 6 | Consumidor: `ExplorePage` | 5 | Ver los 5 productos del paso 4 | ✅ |
+| 7 | Consumidor: `CartDrawer` + `CartContext` + `AppNav` | 2, 6 | Agregar y comparar | ✅ |
+| 8 | Actualizar `ARQUITECTURA.md` §4, §5, §6, §7 y este documento | todo | Lectura | ✅ |
+
+Migraciones aplicadas: **020** (`is_cart`), **021** (`created_by_chain_id`) y
+**022** (reparación de datos del seed, ver §11.1).
 
 ---
 
@@ -506,3 +518,127 @@ Anotado para que no se cuele por el costado:
 | El "precio desde" confunde cuando el total real es otro | Lenguaje explícito en la UI: "desde", "estimado", y el total en firme sólo después de elegir supermercado |
 | `GET /products` con precios se vuelve el endpoint más caro | Dos consultas fijas, `per_page` topeado, y los índices de la 009 (`idx_sp_product_id`, trigram sobre `name`) ya están |
 | Exponer precios con más detalle facilita el scraping | Ver D4. La autenticación ya es obligatoria en `/products`; falta el límite por usuario |
+
+---
+
+## 11. Desvíos del plan (v2.0)
+
+Lo que cambió al implementar, y por qué. Cada punto se detectó contrastando el
+plan contra el código y la base reales, no en abstracto.
+
+### 11.1 Los precios del seed estaban en pesos, no en centavos
+
+El plan se contradecía a sí mismo: §5.5 dice "se ingresa en pesos; la conversión
+a centavos vive en el service", pero el mockup de §6.2 imprime `best_price: 1199`
+como "$1.199" — que en centavos es $11,99.
+
+La base decidió el empate: `price` es INTEGER en centavos desde la 003 y
+`NORMAS.md` §4.3 lo exige. Lo que estaba mal era **el dato**: el seed (007) cargó
+1950 para un litro de aceite, o sea $19,50.
+
+Y del lado del front el mismo error, espejado: `ListDetailPage`, `CheckoutPage` y
+`TrackingPage` hacían `total.toFixed(2)` sobre centavos, mostrando "$405000.00"
+donde iba "$4.050,00".
+
+**Qué se hizo:** migración **022** multiplica los precios del seed por 100, y un
+`lib/money.js` en cada front concentra la conversión. Se corrigieron de paso las
+tres pantallas que ya estaban mal. `LandingPage` queda como está: sus números son
+datos de demostración en pesos, no vienen de la API.
+
+### 11.2 El carrito se colaba entre "Mis listas"
+
+El plan define el carrito como una fila de `shopping_lists` (§2.1) pero nunca dice
+qué hace `GET /lists` con ella. Sin filtrar, "Mi carrito" aparecía mezclado entre
+las listas guardadas, y se podía renombrar o borrar como cualquier otra —
+volviendo confuso el propio `POST /lists/cart/save`, cuyo sentido es justamente
+mover la lista de un estado al otro.
+
+**Qué se hizo:** `list_lists` filtra `is_cart = false`, y `is_cart` se expone en
+las respuestas para que el front pueda distinguirlos.
+
+### 11.3 `products.unit` es un ENUM, no texto libre
+
+§5.4 describe `unit` y `size_unit` como campos más del draft. En la base son del
+tipo `product_unit` (`kg`, `g`, `L`, `ml`, `un`), creado en la 008. Un valor fuera
+de esa lista no es un dato feo: es un error 22P02 de Postgres que sale como **500**.
+
+**Qué se hizo:** `ProductUnit` es un `Literal` en el schema, así falla como 422
+señalando el campo. El `<select>` del panel ofrece exactamente esos cinco.
+
+### 11.4 `.maybe_single()` devuelve `None`, no un objeto vacío
+
+No estaba en el plan porque es anterior a él, pero apareció al construir el
+carrito encima de `get_list_or_404`.
+
+`postgrest-py` devuelve **`None` como respuesta completa** cuando no hay fila, no
+un objeto con `.data = None`. `list_service.get_list_or_404` hacía `result.data`
+directo: pedir la lista de otro usuario daba **500 en vez de 404**, que es
+exactamente lo que `SEGURIDAD.md` §4.3 prohíbe para un recurso ajeno.
+
+El test que debía cubrirlo pasaba porque su mock devolvía `FakeResult(data=None)`,
+que no es lo que hace la librería.
+
+**Qué se hizo:** `core/supabase_client.single_row()` normaliza el caso en un solo
+lugar documentado, y los tests usan `NO_ROW` (que es `None` de verdad).
+
+### 11.5 El EAN del seed hacía intestable el matcheo
+
+§8 paso 2 pide cargar "un EAN que ya existe en el catálogo" para comprobar que
+vincula en vez de duplicar. Los 6 productos del seed tenían `ean = NULL`: el
+camino no se podía ejercitar contra el catálogo inicial, y el primer supermercado
+real que cargara leche habría creado una fila paralela sin que nadie lo notara.
+
+**Qué se hizo:** la 022 les carga un EAN-13 de demostración (prefijo 779, GS1
+Argentina).
+
+### 11.6 El `AppNav` prometía una pantalla que no existía
+
+§6.3 pide una barra con "Explorar / Mis listas / Pedidos", pero `/app/orders` no
+era una ruta: solo existía `/app/orders/:id`. El `useOrders` estaba escrito y sin
+usar por ninguna pantalla.
+
+**Qué se hizo:** se agregó una `OrdersPage` mínima sobre `GET /orders` y el hook
+que ya existía. Alternativa descartada: sacar "Pedidos" del nav, que dejaba al
+usuario sin forma de volver a un pedido pasado.
+
+### 11.7 Precisiones que el plan dejaba ambiguas
+
+| Punto | Resolución |
+|---|---|
+| `{id}` en `PATCH`/`DELETE /supermarkets/me/products/{id}` | Es el id de la fila de `supermarket_products` (el precio), no el del producto global |
+| Qué pasa en Explorar con una cadena suspendida (§8 paso 8) | **El producto queda, el precio desaparece.** `products` es global y compartido: no puede esconderse porque una cadena se suspenda. La UI muestra "Sin precio disponible" y `available_in: 0`. Lo que se verifica es que el precio no se filtre |
+| Rol `staff` en `ProductsPage` | Ve los precios pero no los edita (matriz de `SEGURIDAD.md` §4.2): `require_approved_chain` para leer, `require_approved_manager` para escribir |
+| EAN que matchea con otro nombre | Gana la fila que ya está; el draft se descarta. Una cadena no reescribe el catálogo de sus competidores (§5.2) |
+| `best_price` de los ítems de una lista | Se agregó a `ShoppingListItemOut` para el "estimado desde" del drawer, con una sola consulta por lista |
+
+---
+
+## 12. Verificación ejecutada
+
+No es una lista de intenciones: es lo que se corrió.
+
+| Qué | Resultado |
+|---|---|
+| `pytest` completo | **61 pasan** (eran 28 antes del sprint) |
+| Recorrido de §8 sobre HTTP real y JWT real | **Todo verde**, incluidos los 8 pasos |
+| Render de los componentes nuevos (react-dom/server) | **27/27** consumidor, **19/19** panel |
+| `npm run build` en ambos fronts | Sin errores |
+| `npm run lint` en ambos fronts | Sin errores; se eliminaron los 3 avisos de `no-unused-vars` que había |
+
+Lo que cubrió el recorrido de §8, sobre la base real:
+
+- Una cadena en `pending_review` recibe 403 al tocar su catálogo; aprobada, opera.
+- Un EAN existente **vincula** — `products` no creció — y el nombre global no se pisó.
+- Un EAN nuevo crea la fila con `created_by_chain_id`.
+- Un `supermarket_id` de otra cadena da 404, tanto para leer como para publicar.
+- Un `staff` lee el catálogo y recibe 403 al escribir.
+- En Explorar, el producto más barato del súper nuevo gana el "desde" y
+  `available_in` sube a 4.
+- **Agregar un producto repetido al carrito suma la cantidad** (1 → 2) y no crea
+  una segunda línea: es exactamente lo que devolvía 500 antes de este sprint.
+- `PATCH` fija la cantidad; con `quantity = 0` da 422.
+- `GET /lists` no devuelve el carrito.
+- El comparador lista al súper nuevo y el pedido se crea y se lee.
+- Al suspender la cadena, sus precios desaparecen de Explorar y del comparador
+  **aunque las filas sigan en la base** — la prueba de que el filtro está en
+  Python y no se confía en RLS.

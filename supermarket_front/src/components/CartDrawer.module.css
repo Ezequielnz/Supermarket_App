@@ -93,16 +93,6 @@
   padding: 0.75rem;
 }
 
-.itemEmoji {
-  display: grid;
-  place-items: center;
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: 0.75rem;
-  font-size: 1.75rem;
-  flex-shrink: 0;
-}
-
 .itemInfo {
   flex: 1;
   min-width: 0;
@@ -141,7 +131,12 @@
   transition: background 150ms;
 }
 
-.qtyControl button:hover { background: var(--secondary); }
+.qtyControl button:hover:not(:disabled) { background: var(--secondary); }
+
+.qtyControl button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
 
 .qtyControl span {
   min-width: 1rem;
@@ -155,19 +150,79 @@
   padding-top: 1.25rem;
 }
 
-.subtotal {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-  color: var(--muted-foreground);
-}
-
 .totalRow {
   display: flex;
   justify-content: space-between;
-  margin-top: 0.5rem;
+  gap: 1rem;
   font-size: 1.125rem;
   font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* El carrito no esta atado a un supermercado, asi que no hay un total en
+   firme. Decirlo explicitamente evita prometer un precio que cambia al elegir
+   tienda. */
+.disclaimer {
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.removeBtn {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  border-radius: 50%;
+  transition: background 150ms, color 150ms;
+}
+
+.removeBtn:hover:not(:disabled) {
+  color: var(--destructive);
+  background: var(--card);
+}
+
+.removeBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.saveBtn {
+  margin-top: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  transition: background 200ms;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background: var(--secondary);
+}
+
+.saveBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.error {
+  margin-top: 1rem;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--destructive);
+  background: color-mix(in oklch, var(--destructive) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--destructive) 25%, transparent);
+  border-radius: 0.65rem;
 }
 
 .checkoutBtn {

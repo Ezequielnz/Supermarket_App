@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { ArrowLeft, PackageCheck, X } from 'lucide-react'
 
+import AppNav from '../../components/AppNav'
+import { formatPrice } from '../../lib/money'
 import { getOrder, getOrderStatus, cancelOrder } from '../../services/orders.service'
 import styles from './TrackingPage.module.css'
 
@@ -59,8 +61,9 @@ export default function TrackingPage() {
 
   return (
     <div className={styles.page}>
-      <a href="#/app" className={styles.backLink}>
-        <ArrowLeft size={16} /> Volver al panel
+      <AppNav />
+      <a href="#/app/orders" className={styles.backLink}>
+        <ArrowLeft size={16} /> Volver a mis pedidos
       </a>
       <h1 className={styles.title}>Pedido en {order.supermarket.name}</h1>
 
@@ -73,14 +76,14 @@ export default function TrackingPage() {
         <span>Retiro programado</span>
         <strong>{new Date(order.pickup_scheduled).toLocaleString()}</strong>
         <span>Total</span>
-        <strong>${order.total_price?.toFixed?.(2) ?? order.total_price}</strong>
+        <strong>{formatPrice(order.total_price)}</strong>
       </div>
 
       <div className={styles.items}>
         {order.items.map((item) => (
           <div key={item.product_id} className={styles.item}>
             <span>{item.product_name} x{item.quantity}</span>
-            <span>${item.subtotal.toFixed(2)}</span>
+            <span>{formatPrice(item.subtotal)}</span>
           </div>
         ))}
       </div>

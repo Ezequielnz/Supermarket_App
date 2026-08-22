@@ -729,28 +729,6 @@
 /* ══════════════════════════════════════
    TOAST
 ══════════════════════════════════════ */
-.toast {
-  position: fixed;
-  bottom: max(1.5rem, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border-radius: 9999px;
-  background: var(--foreground);
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--background);
-  box-shadow: 0 8px 30px rgba(18, 18, 18, 0.2);
-  white-space: nowrap;
-  animation: fadeUp 200ms ease;
-  max-width: calc(100vw - 2.5rem);
-  text-align: center;
-}
-
 @keyframes fadeUp {
   from {
     opacity: 0;
