@@ -116,25 +116,87 @@
   gap: 0.75rem;
 }
 
-.itemQty { color: var(--muted-foreground); font-size: 0.8125rem; }
-
-.removeBtn { color: var(--muted-foreground); padding: 0.25rem; transition: color 200ms; }
-.removeBtn:hover { color: var(--destructive); }
-
-.compareBtn {
+/* Mismo stepper que el drawer del carrito (CartDrawer.module.css): es el mismo
+   control sobre el mismo endpoint, y divergir visualmente no tendria sentido. */
+.qtyControl {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
-  border-radius: var(--radius);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  padding: 0.875rem;
-  font-size: 0.9375rem;
-  font-weight: 700;
+  border-radius: 9999px;
+  background: var(--secondary);
+  padding: 0.25rem 0.5rem;
 }
 
-.compareBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+.qtyControl button {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  transition: background 150ms;
+}
+
+.qtyControl button:hover:not(:disabled) { background: var(--card); }
+
+.qtyControl button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.qtyControl span {
+  min-width: 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.removeBtn {
+  color: var(--muted-foreground);
+  padding: 0.25rem;
+  transition: color 200ms;
+}
+
+.removeBtn:hover:not(:disabled) { color: var(--destructive); }
+.removeBtn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.resultsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* La comparacion se dispara sola al abrir la lista, asi que este boton dejo de
+   ser el CTA principal: es un secundario para forzar el recalculo. */
+.refreshBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 9999px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+  transition: background 200ms, color 200ms;
+}
+
+.refreshBtn:hover:not(:disabled) {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
+.refreshBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.freshness {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  margin-top: -0.35rem;
+}
 
 .results {
   display: flex;
@@ -145,6 +207,7 @@
 .resultCard {
   display: flex;
   align-items: center;
+  gap: 1rem;
   justify-content: space-between;
   border-radius: var(--radius);
   border: 1.5px solid var(--border);
@@ -152,8 +215,51 @@
   padding: 1rem 1.25rem;
 }
 
+.resultMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.resultTop {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .resultName { font-weight: 700; }
-.resultMeta { font-size: 0.8125rem; color: var(--muted-foreground); margin-top: 0.15rem; }
+
+/* Cuantos productos de la lista cubre este supermercado. Un total parcial no es
+   comparable con uno completo, asi que la cobertura va al lado del nombre y no
+   escondida abajo. */
+.coverage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.coverage[data-complete='true'] {
+  background: color-mix(in oklch, var(--primary) 22%, var(--card));
+  color: var(--primary-foreground);
+}
+
+.coverage[data-complete='false'] {
+  background: color-mix(in oklch, var(--destructive) 12%, var(--card));
+  color: var(--destructive);
+}
+
+.missing {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
 
 .resultRight {
   display: flex;
@@ -175,4 +281,55 @@
   transition: background 200ms;
 }
 
-.chooseBtn:hover { background: var(--secondary); }
+.chooseBtn:hover:not(:disabled) { background: var(--secondary); }
+
+.chooseBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Renombrar la lista desde el titulo. */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.renameBtn {
+  color: var(--muted-foreground);
+  padding: 0.3rem;
+  border-radius: 50%;
+  transition: background 200ms, color 200ms;
+}
+
+.renameBtn:hover {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
+.renameForm {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.renameForm .searchInput {
+  flex: 1 1 12rem;
+  padding-left: 1rem;
+}
+
+.renameSave {
+  border-radius: 9999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.renameCancel {
+  border-radius: 9999px;
+  border: 1.5px solid var(--border);
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}

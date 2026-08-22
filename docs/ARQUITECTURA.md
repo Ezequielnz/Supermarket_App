@@ -68,41 +68,64 @@ supermarket_front/src/
 ├── App.jsx                    # Router raiz
 ├── index.css                  # Design tokens CSS globales
 ├── components/
-│   ├── Navbar.jsx / .module.css
+│   ├── Navbar.jsx / .module.css      # solo la landing publica
+│   ├── AppNav.jsx / .module.css      # navegacion de /app + badge del carrito
 │   ├── CartDrawer.jsx / .module.css
-│   ├── ui/                    # Button, Input, Badge, Modal, Toast
-│   └── shared/                # Loader, EmptyState, ProtectedRoute
+│   └── shared/                # ProtectedRoute
 ├── pages/
 │   ├── LandingPage.jsx        # / — publica
 │   ├── AuthPage.jsx           # /auth
 │   └── app/                   # Rutas protegidas
 │       ├── DashboardPage.jsx  # /app
+│       ├── ExplorePage.jsx    # /app/explore — catalogo con precios
 │       ├── ListsPage.jsx      # /app/lists
 │       ├── ListDetailPage.jsx # /app/lists/:id — comparador
 │       ├── CheckoutPage.jsx   # /app/checkout
+│       ├── OrdersPage.jsx     # /app/orders
 │       └── TrackingPage.jsx   # /app/orders/:id
 ├── hooks/
 │   ├── useAuth.js
+│   ├── useCart.js
 │   ├── useLists.js
 │   └── useOrders.js
+├── lib/
+│   └── money.js               # centavos <-> pesos, en un solo lugar
 ├── services/
 │   ├── api.js                 # Cliente HTTP base (fetch wrapper)
 │   ├── auth.service.js
+│   ├── cart.service.js
 │   ├── lists.service.js
 │   ├── products.service.js
 │   └── orders.service.js
 └── context/
-    └── AuthContext.jsx
+    ├── AuthContext.jsx
+    └── CartContext.jsx        # carrito compartido entre explorar/drawer/badge
 ```
+
+> **`lib/` es una carpeta nueva** respecto de la estructura original, y la
+> justificacion que pide NORMAS.md §9 es esta: `money.js` no habla con la API
+> (no es un `service`) ni renderiza (no es un `component`), y lo usan pantallas
+> que no comparten servicio. Tenerlo suelto en cada una fue justamente el bug
+> que arrastraba el proyecto — `total.toFixed(2)` sobre centavos mostraba
+> $405000.00 donde iba $4.050,00.
 
 ### 4.3 Flujo del Usuario Consumidor
 
 ```
 [Registro/Login]
       |
-[Dashboard] → [Mis Listas]
-                   |
-         [Crear/editar lista — agrega productos]
+[Dashboard] ────────────────┬──────────────────┐
+      |                     |                  |
+[Explorar productos]   [Mis Listas]       [Mis Pedidos]
+ — precio "desde" y          |                  |
+   en cuantos supers         |                  |
+      |                      |                  |
+ [Agregar al carrito] ───────┤                  |
+      |                      |                  |
+ [Carrito (drawer)]          |                  |
+  — cantidades, estimado     |                  |
+      |                      |                  |
+      └──> "Comparar precios" <──[Crear/editar lista]
                    |
          [Comparar precios por supermercado]
                    |
@@ -112,6 +135,13 @@ supermarket_front/src/
                    |
          [Seguimiento: Recibido → Preparando → Listo → Completado]
 ```
+
+**El carrito ES una lista de compras** (`shopping_lists.is_cart = true`), no una
+tabla aparte. Por eso el carrito y una lista guardada desembocan en el mismo
+comparador y el mismo checkout, en vez de tener dos caminos paralelos. El
+carrito **no se ata a un supermercado**: se agregan productos genericos
+(`product_id`) y la eleccion de donde comprar sigue pasando por el comparador,
+al final. Ver `PLAN_CATALOGO_Y_CARRITO.md` §2.
 
 ---
 
@@ -131,6 +161,7 @@ supermarket_admin/src/
 ├── components/
 │   ├── Sidebar.jsx / .module.css
 │   ├── TopBar.jsx / .module.css
+│   ├── ProductFormModal.jsx / .module.css   # alta en 2 pasos: buscar y cargar
 │   ├── ui/                     # Button, Input, Field, Badge
 │   └── shared/
 │       ├── ProtectedRoute.jsx  # exige sesion
@@ -144,21 +175,27 @@ supermarket_admin/src/
 │       ├── AppLayout.jsx       # sidebar + outlet
 │       ├── ProfilePage.jsx     # /app/profile
 │       ├── StoresPage.jsx      # /app/stores
+│       ├── ProductsPage.jsx    # /app/products — catalogo y precios
 │       └── TeamPage.jsx        # /app/team   (solo owner)
 ├── hooks/
 │   └── useAdminAuth.js
+├── lib/
+│   └── money.js                # copia de supermarket_front (NORMAS §2)
 ├── services/
 │   ├── api.js                  # copia literal de supermarket_front (NORMAS §2)
 │   ├── supabaseClient.js       # idem
 │   ├── auth.service.js
+│   ├── products.service.js
 │   └── supermarket.service.js
 └── context/
     └── AdminAuthContext.jsx
 ```
 
-Pendiente para el siguiente sprint: `OrdersPage`, `OrderDetailPage` y
-`ProductsPage`, mas la UI de moderacion de plataforma (hoy la aprobacion se
-hace por `POST /admin/chains/{id}/review`).
+Pendiente para el siguiente sprint: `OrdersPage` y `OrderDetailPage` del
+supermercado, mas la UI de moderacion de plataforma (hoy la aprobacion se hace
+por `POST /admin/chains/{id}/review`). **El panel de pedidos es lo que mas
+falta**: sin el, un pedido creado no lo ve nadie del lado del supermercado y
+nunca sale de `pending`.
 
 ### 5.3 Onboarding del Supermercado
 
@@ -260,8 +297,15 @@ backend/
 #### Productos
 | Metodo | Ruta | Descripcion | Rol |
 |---|---|---|---|
-| GET | /products | Busqueda ?q=leche | Consumidor |
+| GET | /products | Busqueda ?q= &category= &sort=name\|price, con mejor precio | Consumidor |
+| GET | /products/categories | Categorias del catalogo | Consumidor |
 | GET | /products/{id}/prices | Precios en todos los supers | Consumidor |
+
+> `GET /products` devuelve, ademas del producto, `best_price`,
+> `best_price_supermarket` y `available_in`. Son **dos consultas fijas** (la
+> pagina de productos y una sola de precios sobre esos ids), no una por
+> producto. Solo entran precios de sucursales activas de cadenas aprobadas: el
+> filtro esta en Python porque el backend bypasea RLS (SEGURIDAD.md §5.1).
 
 #### Listas de compra
 | Metodo | Ruta | Descripcion | Rol |
@@ -271,9 +315,26 @@ backend/
 | GET | /lists/{id} | Detalle | Consumidor |
 | PUT | /lists/{id} | Renombrar | Consumidor |
 | DELETE | /lists/{id} | Eliminar | Consumidor |
-| POST | /lists/{id}/items | Agregar producto | Consumidor |
+| POST | /lists/{id}/items | Agregar producto (suma si ya esta) | Consumidor |
+| PATCH | /lists/{id}/items/{item_id} | Fijar cantidad | Consumidor |
 | DELETE | /lists/{id}/items/{item_id} | Quitar producto | Consumidor |
 | GET | /lists/{id}/compare | Comparar precios | Consumidor |
+
+#### Carrito
+| Metodo | Ruta | Descripcion | Rol |
+|---|---|---|---|
+| GET | /lists/cart | Carrito activo con sus items; lo crea si no existe | Consumidor |
+| POST | /lists/cart/items | Agregar al carrito sin conocer su id | Consumidor |
+| POST | /lists/cart/save | Guardarlo como lista (`is_cart = false`) | Consumidor |
+
+> Estas rutas van declaradas **antes** de `/lists/{list_id}` en el router: al
+> reves, FastAPI intenta parsear `"cart"` como UUID y devuelve 422.
+>
+> `POST /lists/{id}/items` es **idempotente por producto**: agregar dos veces el
+> mismo producto suma la cantidad. Antes hacia un INSERT plano y violaba el
+> `unique_product_per_list` de la 009 con un 500 — y agregar dos veces lo mismo
+> es lo que hace un carrito todo el tiempo. Para fijar la cantidad (el control
+> − / +) esta el `PATCH`.
 
 #### Pedidos
 | Metodo | Ruta | Descripcion | Rol |
@@ -295,6 +356,19 @@ backend/
 | PATCH | /supermarkets/me/stores/{id} | Editar sucursal y horarios | Owner/Manager |
 | GET | /supermarkets/me/users | Equipo de la cadena | Owner |
 | POST | /supermarkets/me/users | Invitar a un empleado | Owner |
+| GET | /supermarkets/me/products | Catalogo propio con precios | Staff, cadena aprobada |
+| GET | /supermarkets/me/products/lookup | Buscar en el catalogo global por `?ean=` o `?q=` | Staff, cadena aprobada |
+| POST | /supermarkets/me/products | Empezar a vender un producto | Owner/Manager, aprobada |
+| PATCH | /supermarkets/me/products/{id} | Cambiar precio o stock | Owner/Manager, aprobada |
+| DELETE | /supermarkets/me/products/{id} | Dejar de venderlo | Owner/Manager, aprobada |
+
+> El `{id}` de los dos ultimos es el de la fila de `supermarket_products` (el
+> precio), **no** el del producto global.
+>
+> Son los primeros endpoints que usan `require_approved_chain`: publicar
+> precios es operar, y una cadena en revision, rechazada o suspendida no opera.
+> El rol `staff` lee pero no escribe (`require_approved_manager`), segun la
+> matriz de SEGURIDAD.md §4.2.
 
 #### Moderacion de Plataforma
 | Metodo | Ruta | Descripcion | Rol |
@@ -307,8 +381,6 @@ backend/
 |---|---|---|---|
 | GET | /supermarkets/me/orders | Pedidos del super | Staff |
 | PATCH | /supermarkets/me/orders/{id}/status | Cambiar estado | Staff |
-| GET | /supermarkets/me/products | Catalogo y precios | Staff |
-| PUT | /supermarkets/me/products/{id} | Actualizar precio | Owner/Manager |
 
 ---
 
@@ -350,11 +422,31 @@ cuelgan del local, que es donde el cliente retira.
 | `supermarket_users` | Staff, con su rol y su cadena | 012 |
 | `platform_admins` | Operadores de FreshMart | 013 |
 | `chain_verification_log` | Auditoria de aprobaciones y rechazos | 013 |
-| `products` | Catalogo global (con EAN para machear entre cadenas) | 003, 016 |
+| `products` | Catalogo global (con EAN para machear entre cadenas) | 003, 016, 021 |
 | `supermarket_products` | Precio vigente por sucursal y producto | 003 |
 | `price_history` | Precios anteriores, por trigger | 016 |
-| `shopping_lists` / `shopping_list_items` | Listas del consumidor | 004 |
+| `shopping_lists` / `shopping_list_items` | Listas del consumidor, y el carrito (`is_cart`) | 004, 020 |
 | `orders` / `order_items` / `order_status_log` | Pedidos y su historial | 005 |
+
+**`products` es una tabla compartida entre competidores.** Todos los precios de
+"Leche entera 1L" cuelgan de la misma fila: eso es lo que hace posible el
+comparador. De ahi las reglas de escritura, que se aplican en
+`catalog_service.py` porque el backend bypasea RLS:
+
+- Una cadena **puede crear** filas nuevas en `products`.
+- Una cadena **no puede editar ni borrar** filas existentes. Si un producto
+  global esta mal, lo corrige un admin de plataforma. Cuando el EAN que carga
+  matchea uno que ya existe, el resto de los datos que manda se **descartan**:
+  gana el que estaba.
+- `created_by_chain_id` (021) deja el rastro de quien introdujo cada fila.
+- El `UNIQUE` sobre `ean` (016) es la red que impide duplicar por codigo de
+  barras. Sin EAN no hay matcheo automatico: el backend ofrece candidatos por
+  nombre y el staff elige explicitamente. Nunca se adivina.
+
+**El carrito no es una tabla.** Es `shopping_lists` con `is_cart = true`, con un
+indice unico parcial (`idx_one_cart_per_user`) que permite uno solo por usuario.
+`GET /lists` filtra `is_cart = false` para no mezclarlo con las listas
+guardadas.
 
 ### 7.3 Tipos enumerados
 
@@ -477,27 +569,49 @@ una fila en `profiles`: un usuario es consumidor XOR staff, nunca las dos cosas.
 
 **Endpoint:** GET /api/v1/lists/{id}/compare
 
-1. Obtener todos los shopping_list_items de la lista.
-2. Para cada product_id, consultar supermarket_products.
+El consumidor **no lo dispara a mano**: el front lo llama solo al abrir la
+lista (`useCompare`), con cache por lista de 5 minutos. El boton "Actualizar
+precios" fuerza el recalculo.
+
+1. Obtener todos los shopping_list_items de la lista, **ordenados por
+   `(created_at, id)`**. Sin ORDER BY, PostgREST devuelve los items en orden no
+   determinista y la lista guardada se ve distinta en cada visita (migracion
+   023).
+2. Para cada product_id, consultar supermarket_products con stock.
 3. **Descartar los supermercados inactivos y los de cadenas no aprobadas**
    (`is_supermarket_visible`). Sin este paso, una cadena en revision apareceria
    en el comparador apenas cargue precios: el backend usa `service_role` y las
    policies de la migracion 015 no lo alcanzan.
-4. Agrupar por supermercado y sumar totales.
-5. Si un supermercado no tiene algun producto → marcarlo incompleto.
-6. Devolver resultados ordenados de menor a mayor.
+4. Agrupar por supermercado y sumar totales **redondeando por item**
+   (`round(price * quantity)`), igual que `order_service` al crear el pedido.
+   Redondear una sola vez sobre la suma hacia que el comparador prometiera un
+   total y el pedido cobrara otro cuando las cantidades son decimales.
+5. Si un supermercado no tiene algun producto (o lo tiene sin stock), **nombrar
+   ese producto en `missing`** y omitirlo de su total. Nunca se inventa un
+   precio. Un supermercado que no tiene NINGUN producto de la lista no aparece.
+6. Devolver los **completos primero** y, dentro de cada grupo, de menor a mayor
+   total. Un total parcial no es comparable con uno completo: ordenar todo junto
+   por precio pondria arriba al supermercado al que le falta media lista.
+
+Un resultado incompleto **no ofrece el boton de checkout**: `POST /orders`
+devuelve 409 si falta stock de algun producto, asi que elegirlo llevaria a un
+error garantizado.
 
 **Respuesta:**
 ```json
 {
   "list_id": "...",
   "items_count": 8,
+  "generated_at": "2026-08-22T14:05:00Z",
   "results": [
     {
       "supermarket": { "id": "...", "name": "Vital" },
       "total": 104500,
       "currency": "ARS",
       "is_complete": true,
+      "items_covered": 8,
+      "items_total": 8,
+      "missing": [],
       "items": [
         { "product_id": "...", "product_name": "Leche 1L", "price": 1250, "in_stock": true }
       ]
