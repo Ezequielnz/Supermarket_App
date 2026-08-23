@@ -12,6 +12,17 @@ from app.schemas.supermarket import (
     SupermarketRegisterResponse,
 )
 
+# TEMPORAL: sin proveedor de correo propio configurado en Supabase, el
+# servicio de mail por defecto tiene un límite muy bajo de envíos por hora y
+# no da abasto para probar el alta de supermercados repetidas veces. Mientras
+# tanto, la cuenta se crea ya confirmada.
+#
+# Es un cambio de seguridad real, no cosmético: docs/SEGURIDAD.md §3.3 explica
+# por qué `email_confirm: True` importa acá — permite registrarse con la
+# dirección de otra persona, y esta cuenta puede publicar precios y recibir
+# pedidos. Revertir a True apenas haya SMTP configurado.
+REQUIRE_EMAIL_CONFIRMATION = False
+
 # Mensajes que levantan las funciones plpgsql de 014 con RAISE EXCEPTION,
 # mapeados al código HTTP que corresponde. Igual que en order_service:
 # supabase-py no expone un tipo de excepción estable para errores de RPC, así
@@ -46,10 +57,11 @@ def register_chain(payload: SupermarketRegisterRequest) -> SupermarketRegisterRe
        horarios, el usuario owner y el log de verificación en una sola
        transacción.
 
-    A diferencia del registro de consumidor, `email_confirm` es False: el
-    supermercado tiene que confirmar su correo de verdad antes de operar.
-    Publica precios y recibe pedidos, así que la cuenta debe ser suya
-    (docs/SEGURIDAD.md §3.3).
+    A diferencia del registro de consumidor, `email_confirm` normalmente es
+    False: el supermercado tiene que confirmar su correo de verdad antes de
+    operar. Publica precios y recibe pedidos, así que la cuenta debe ser suya
+    (docs/SEGURIDAD.md §3.3). Ver REQUIRE_EMAIL_CONFIRMATION más arriba: hoy
+    ese chequeo está temporalmente apagado.
     """
     client = get_supabase()
 
@@ -70,7 +82,7 @@ def register_chain(payload: SupermarketRegisterRequest) -> SupermarketRegisterRe
             {
                 "email": payload.email,
                 "password": payload.password,
-                "email_confirm": False,
+                "email_confirm": not REQUIRE_EMAIL_CONFIRMATION,
                 "user_metadata": {
                     "account_type": "supermarket_staff",
                     "full_name": payload.owner_full_name,
@@ -144,7 +156,7 @@ def register_chain(payload: SupermarketRegisterRequest) -> SupermarketRegisterRe
         chain_id=rpc_result.data,
         trade_name=payload.trade_name,
         status="pending_review",
-        email_confirmation_required=True,
+        email_confirmation_required=REQUIRE_EMAIL_CONFIRMATION,
     )
 
 

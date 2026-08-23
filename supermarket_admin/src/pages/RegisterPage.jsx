@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Field from '../components/ui/Field'
 import Input from '../components/ui/Input'
+import { useAdminAuth } from '../hooks/useAdminAuth'
 import { registerSupermarket } from '../services/supermarket.service'
 import styles from './RegisterPage.module.css'
 
@@ -98,6 +99,7 @@ function validateStep(step, form, hours) {
 }
 
 export default function RegisterPage() {
+  const { login } = useAdminAuth()
   const [step, setStep] = useState(0)
   const [form, setForm] = useState(INITIAL_FORM)
   const [hours, setHours] = useState(INITIAL_HOURS)
@@ -168,11 +170,25 @@ export default function RegisterPage() {
         },
         accepts_terms: form.accepts_terms,
       })
-      // Sin login automático, a diferencia del registro del consumidor: el
-      // correo del supermercado se confirma de verdad antes de poder entrar.
-      window.location.hash = '#/pending?enviado=1'
     } catch (err) {
       setSubmitError(err.message || 'No pudimos completar el registro. Intentá nuevamente.')
+      setLoading(false)
+      return
+    }
+
+    // TEMPORAL: la cuenta se crea ya confirmada mientras
+    // REQUIRE_EMAIL_CONFIRMATION esté en False en supermarket_auth_service.py
+    // (sin SMTP propio configurado), así que se puede iniciar sesión de
+    // inmediato en vez de mandar a esperar un correo. Revertir junto con esa
+    // constante: volver a `window.location.hash = '#/pending?enviado=1'` sin
+    // loguear.
+    try {
+      const profile = await login({ email: form.email, password: form.password })
+      window.location.hash = profile.chain.status === 'approved' ? '#/app/profile' : '#/pending'
+    } catch {
+      // El registro salió bien igual: si el login automático falla, que inicie
+      // sesión a mano en vez de mostrar un error que sugiera que el alta falló.
+      window.location.hash = '#/auth'
     } finally {
       setLoading(false)
     }
@@ -233,7 +249,11 @@ export default function RegisterPage() {
                   id="reg-email"
                   label="Correo electrónico"
                   error={errors.email}
-                  hint="Te vamos a enviar un correo para confirmar la dirección."
+                  // TEMPORAL: sin confirmación de correo (ver el comentario
+                  // junto a REQUIRE_EMAIL_CONFIRMATION en
+                  // supermarket_auth_service.py). Revertir el hint junto con
+                  // esa constante.
+                  hint="Va a ser el usuario con el que inicies sesión."
                   required
                 >
                   {({ id, describedBy }) => (

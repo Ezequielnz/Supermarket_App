@@ -100,14 +100,19 @@ def test_register_creates_chain_pending_review():
     body = response.json()
     assert body["chain_id"] == chain_id
     assert body["status"] == "pending_review"
-    assert body["email_confirmation_required"] is True
+    # TEMPORAL: REQUIRE_EMAIL_CONFIRMATION está en False en
+    # supermarket_auth_service mientras no hay SMTP propio configurado (ver el
+    # comentario junto a esa constante). Cuando se revierta, este assert y el
+    # de mas abajo vuelven a ser True / False.
+    assert body["email_confirmation_required"] is False
 
     # El staff de un supermercado NO es un consumidor: el flag account_type es
     # lo que evita que el trigger handle_new_user le cree una fila en profiles.
     created = fake_client.auth.admin.create_user.call_args[0][0]
     assert created["user_metadata"]["account_type"] == "supermarket_staff"
-    # El correo se confirma de verdad, a diferencia del registro de consumidor.
-    assert created["email_confirm"] is False
+    # email_confirm = not REQUIRE_EMAIL_CONFIRMATION: con el chequeo apagado la
+    # cuenta nace ya confirmada.
+    assert created["email_confirm"] is True
 
     # El CUIT llega normalizado a 11 dígitos, como exige el CHECK de la 010.
     assert fake_client.rpc.call_args[0][1]["p_tax_id"] == "30712345678"
