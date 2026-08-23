@@ -21,6 +21,14 @@ export default function AuthPage() {
     const email = formData.get('email')
     const password = formData.get('password')
 
+    // El form tiene noValidate (abajo), así que el minLength={8} del input de
+    // contraseña nunca se aplica del lado del navegador: sin este chequeo, una
+    // contraseña corta llegaba intacta al backend y volvía como 422.
+    if (!isLogin && password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres')
+      return
+    }
+
     if (!isLogin && password !== formData.get('confirmPassword')) {
       setError('Las contraseñas no coinciden')
       return
