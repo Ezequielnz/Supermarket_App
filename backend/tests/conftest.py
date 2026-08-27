@@ -40,8 +40,8 @@ def chain_mock(execute_result):
     """
     mock = MagicMock()
     chainable = [
-        "select", "insert", "update", "delete", "eq", "neq", "in_", "ilike",
-        "order", "range", "limit", "filter", "is_",
+        "select", "insert", "upsert", "update", "delete", "eq", "neq", "in_",
+        "ilike", "or_", "order", "range", "limit", "filter", "is_",
     ]
     for method in chainable:
         getattr(mock, method).return_value = mock

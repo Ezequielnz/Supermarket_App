@@ -65,21 +65,39 @@ def create_order(payload: OrderCreate, user_id: UUID) -> OrderResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La lista no tiene productos.")
 
     product_ids = [item["product_id"] for item in list_items]
-    prices = (
+    listings = (
         client.table("supermarket_products")
-        .select("product_id, price, currency")
+        .select("product_id, price, currency, stock_quantity")
         .eq("supermarket_id", str(payload.supermarket_id))
         .in_("product_id", product_ids)
         .eq("in_stock", True)
         .execute()
     ).data
-    price_by_product = {row["product_id"]: row["price"] for row in prices}
+    listing_by_product = {row["product_id"]: row for row in listings}
+    price_by_product = {row["product_id"]: row["price"] for row in listing_by_product.values()}
 
     if len(price_by_product) != len(product_ids):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="El supermercado seleccionado no tiene stock de todos los productos de la lista.",
         )
+
+    # Unidades, no solo disponibilidad. `stock_quantity` en NULL es el producto
+    # a granel de la migración 024: no se cuenta, alcanza con in_stock.
+    #
+    # Esto NO reemplaza a la condición que create_order_with_items tiene en su
+    # UPDATE: entre este SELECT y aquel INSERT puede entrar otro pedido por la
+    # última unidad, y el único que serializa a los dos es Postgres. Está acá
+    # para que el caso normal —el que se ve venir— salga con un mensaje que
+    # nombra el producto en vez de con el error genérico del RPC
+    # (docs/SEGURIDAD.md §4.4: validar en cada capa).
+    for item in list_items:
+        available = listing_by_product[item["product_id"]]["stock_quantity"]
+        if available is not None and float(available) < float(item["quantity"]):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="El supermercado no tiene unidades suficientes de algún producto de la lista.",
+            )
 
     items_payload = []
     total_price = 0
@@ -96,18 +114,33 @@ def create_order(payload: OrderCreate, user_id: UUID) -> OrderResponse:
             }
         )
 
-    rpc_result = client.rpc(
-        "create_order_with_items",
-        {
-            "p_user_id": str(user_id),
-            "p_supermarket_id": str(payload.supermarket_id),
-            "p_list_id": str(payload.list_id),
-            "p_pickup_scheduled": payload.pickup_scheduled.isoformat(),
-            "p_notes": payload.notes,
-            "p_total_price": total_price,
-            "p_items": items_payload,
-        },
-    ).execute()
+    try:
+        rpc_result = client.rpc(
+            "create_order_with_items",
+            {
+                "p_user_id": str(user_id),
+                "p_supermarket_id": str(payload.supermarket_id),
+                "p_list_id": str(payload.list_id),
+                "p_pickup_scheduled": payload.pickup_scheduled.isoformat(),
+                "p_notes": payload.notes,
+                "p_total_price": total_price,
+                "p_items": items_payload,
+            },
+        ).execute()
+    except Exception as exc:
+        # `insufficient_stock` lo levanta la función cuando otro pedido se llevó
+        # las unidades entre la validación de arriba y la transacción. No es un
+        # fallo del servidor: el pedido no se creó, y el usuario tiene que ver
+        # el mismo 409 que si lo hubiéramos detectado antes.
+        if "insufficient_stock" in str(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Otro pedido se llevó las últimas unidades mientras confirmabas. Revisá tu lista.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo crear el pedido. Intenta nuevamente.",
+        )
     order_id = rpc_result.data
 
     order = client.table("orders").select("*").eq("id", order_id).single().execute()

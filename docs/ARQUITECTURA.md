@@ -162,6 +162,7 @@ supermarket_admin/src/
 │   ├── Sidebar.jsx / .module.css
 │   ├── TopBar.jsx / .module.css
 │   ├── ProductFormModal.jsx / .module.css   # alta en 2 pasos: buscar y cargar
+│   ├── ProductImportModal.jsx / .module.css # importar del ERP: previsualizar y confirmar
 │   ├── ui/                     # Button, Input, Field, Badge
 │   └── shared/
 │       ├── ProtectedRoute.jsx  # exige sesion
@@ -175,17 +176,19 @@ supermarket_admin/src/
 │       ├── AppLayout.jsx       # sidebar + outlet
 │       ├── ProfilePage.jsx     # /app/profile
 │       ├── StoresPage.jsx      # /app/stores
-│       ├── ProductsPage.jsx    # /app/products — catalogo y precios
+│       ├── ProductsPage.jsx    # /app/products — catalogo, precios y stock
 │       └── TeamPage.jsx        # /app/team   (solo owner)
 ├── hooks/
 │   └── useAdminAuth.js
 ├── lib/
-│   └── money.js                # copia de supermarket_front (NORMAS §2)
+│   ├── money.js                # copia de supermarket_front (NORMAS §2)
+│   └── stock.js                # unidades: null (granel) / 0 (agotado) / n
 ├── services/
-│   ├── api.js                  # copia literal de supermarket_front (NORMAS §2)
+│   ├── api.js                  # copia de supermarket_front + upload() multipart
 │   ├── supabaseClient.js       # idem
 │   ├── auth.service.js
 │   ├── products.service.js
+│   ├── imports.service.js      # vista previa, corrida e historial de importaciones
 │   └── supermarket.service.js
 └── context/
     └── AdminAuthContext.jsx
@@ -263,16 +266,23 @@ backend/
 │   ├── schemas/
 │   │   ├── auth.py
 │   │   ├── product.py
+│   │   ├── catalog.py
+│   │   ├── product_import.py             # importacion de catalogo
 │   │   ├── shopping_list.py
 │   │   ├── order.py
 │   │   └── supermarket.py
 │   └── services/
 │       ├── auth_service.py
 │       ├── product_service.py
+│       ├── catalog_service.py            # catalogo global compartido
 │       ├── list_service.py
 │       ├── comparison_service.py
 │       ├── order_service.py
+│       ├── spreadsheet_reader.py         # archivo -> grilla de celdas
+│       ├── import_mapping.py             # columnas y celdas -> campos
+│       ├── product_import_service.py     # vista previa y corrida
 │       ├── supermarket_auth_service.py   # registro y moderacion
+│       ├── supermarket_product_service.py  # precios de la cadena
 │       └── supermarket_service.py        # perfil, sucursales, equipo
 ├── migrations/                # SQL numerado, ver NORMAS.md §5.2
 ├── tests/
@@ -359,8 +369,11 @@ backend/
 | GET | /supermarkets/me/products | Catalogo propio con precios | Staff, cadena aprobada |
 | GET | /supermarkets/me/products/lookup | Buscar en el catalogo global por `?ean=` o `?q=` | Staff, cadena aprobada |
 | POST | /supermarkets/me/products | Empezar a vender un producto | Owner/Manager, aprobada |
-| PATCH | /supermarkets/me/products/{id} | Cambiar precio o stock | Owner/Manager, aprobada |
+| PATCH | /supermarkets/me/products/{id} | Cambiar precio, unidades o disponibilidad | Owner/Manager, aprobada |
 | DELETE | /supermarkets/me/products/{id} | Dejar de venderlo | Owner/Manager, aprobada |
+| POST | /supermarkets/me/products/import/preview | Leer una planilla del ERP y decir que haria. **No escribe** | Owner/Manager, aprobada |
+| POST | /supermarkets/me/products/import | Aplicar la importacion | Owner/Manager, aprobada |
+| GET | /supermarkets/me/products/imports | Historial de importaciones | Staff, cadena aprobada |
 
 > El `{id}` de los dos ultimos es el de la fila de `supermarket_products` (el
 > precio), **no** el del producto global.
@@ -369,6 +382,14 @@ backend/
 > precios es operar, y una cadena en revision, rechazada o suspendida no opera.
 > El rol `staff` lee pero no escribe (`require_approved_manager`), segun la
 > matriz de SEGURIDAD.md §4.2.
+>
+> Los dos endpoints de importacion son `multipart/form-data` —el archivo mas
+> las opciones— y son los unicos de la API que no reciben JSON. Que la vista
+> previa sea una ruta separada y no un flag `dry_run` es deliberado: el que
+> escribe es destructivo y el que muestra no, y esa diferencia se garantiza
+> mejor con dos rutas que con un booleano. El archivo se sube dos veces (una
+> por paso) y a cambio ninguno de los dos guarda estado entre pedidos. Ver
+> `docs/IMPORTADOR_DE_CATALOGO.md`.
 
 #### Moderacion de Plataforma
 | Metodo | Ruta | Descripcion | Rol |
@@ -423,10 +444,11 @@ cuelgan del local, que es donde el cliente retira.
 | `platform_admins` | Operadores de FreshMart | 013 |
 | `chain_verification_log` | Auditoria de aprobaciones y rechazos | 013 |
 | `products` | Catalogo global (con EAN para machear entre cadenas) | 003, 016, 021 |
-| `supermarket_products` | Precio vigente por sucursal y producto | 003 |
+| `supermarket_products` | Precio y stock vigentes por sucursal y producto | 003, 024 |
 | `price_history` | Precios anteriores, por trigger | 016 |
 | `shopping_lists` / `shopping_list_items` | Listas del consumidor, y el carrito (`is_cart`) | 004, 020 |
 | `orders` / `order_items` / `order_status_log` | Pedidos y su historial | 005 |
+| `product_import_jobs` | Auditoria de cada importacion de catalogo | 025 |
 
 **`products` es una tabla compartida entre competidores.** Todos los precios de
 "Leche entera 1L" cuelgan de la misma fila: eso es lo que hace posible el
@@ -442,6 +464,19 @@ comparador. De ahi las reglas de escritura, que se aplican en
 - El `UNIQUE` sobre `ean` (016) es la red que impide duplicar por codigo de
   barras. Sin EAN no hay matcheo automatico: el backend ofrece candidatos por
   nombre y el staff elige explicitamente. Nunca se adivina.
+
+**El stock son dos columnas y significan cosas distintas.** `in_stock` es la
+decision del supermercado —publicar o no publicar— y `stock_quantity` (024) es
+cuantas unidades quedan. `NULL` en la cantidad es el producto a granel: no se
+cuenta, manda el booleano. `0` fuerza `in_stock = false` por trigger, porque un
+producto sin existencias que se sigue ofreciendo es una venta que falla en el
+mostrador. La relacion es de una sola direccion: reponer stock no republica lo
+que alguien despublico a mano.
+
+Crear un pedido **reserva** ese stock dentro de la misma transaccion que lo
+crea, y cancelarlo lo devuelve (024). Sin eso, dos consumidores compran la
+misma ultima unidad: el filtro `in_stock = true` de `order_service.py` los deja
+pasar a los dos.
 
 **El carrito no es una tabla.** Es `shopping_lists` con `is_cart = true`, con un
 indice unico parcial (`idx_one_cart_per_user`) que permite uno solo por usuario.
@@ -518,8 +553,8 @@ para que sea atomica:
 
 | Funcion | Escribe en | Migracion |
 |---|---|---|
-| `create_order_with_items` | orders, order_items, order_status_log | 006 |
-| `cancel_order` | orders, order_status_log | 006 |
+| `create_order_with_items` | orders, order_items, order_status_log, supermarket_products (reserva stock) | 006, 024 |
+| `cancel_order` | orders, order_status_log, supermarket_products (devuelve stock) | 006, 024 |
 | `register_supermarket_chain` | chains, supermarkets, store_hours, supermarket_users, chain_verification_log | 014 |
 | `review_chain` | chains, chain_verification_log | 014 |
 

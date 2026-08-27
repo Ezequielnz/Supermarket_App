@@ -25,13 +25,21 @@ export async function lookupProduct({ ean, q, supermarketId } = {}) {
 
 // `product_id` para vincular a un producto global existente, o `product` (el
 // borrador) para proponer uno nuevo. El backend rechaza mandar los dos.
-export async function createMyProduct({ supermarketId, price, inStock = true, productId, product }) {
+export async function createMyProduct({
+  supermarketId,
+  price,
+  inStock = true,
+  stockQuantity,
+  productId,
+  product,
+}) {
   return apiClient.post(
     '/supermarkets/me/products',
     {
       supermarket_id: supermarketId,
       price,
       in_stock: inStock,
+      stock_quantity: stockQuantity ?? null,
       product_id: productId ?? undefined,
       product: product ?? undefined,
     },
@@ -39,10 +47,14 @@ export async function createMyProduct({ supermarketId, price, inStock = true, pr
   )
 }
 
-export async function updateMyProduct(listingId, { price, inStock }) {
+// `stockQuantity` distingue tres cosas: no mandarlo (undefined) deja el stock
+// como está, mandarlo en null apaga el conteo de unidades de ese producto, y
+// un número lo fija. JSON.stringify descarta las claves undefined, así que el
+// primer caso ni siquiera viaja.
+export async function updateMyProduct(listingId, { price, inStock, stockQuantity }) {
   return apiClient.patch(
     `/supermarkets/me/products/${listingId}`,
-    { price, in_stock: inStock },
+    { price, in_stock: inStock, stock_quantity: stockQuantity },
     { auth: true },
   )
 }

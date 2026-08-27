@@ -30,7 +30,8 @@ Supermarket_App/
     ├── ARQUITECTURA.md
     ├── NORMAS.md          # este archivo
     ├── SEGURIDAD.md
-    └── PLAN_CATALOGO_Y_CARRITO.md
+    ├── PLAN_CATALOGO_Y_CARRITO.md
+    └── IMPORTADOR_DE_CATALOGO.md
 ```
 
 - **Nunca** mezclar codigo de `supermarket_front` con `supermarket_admin`. Son

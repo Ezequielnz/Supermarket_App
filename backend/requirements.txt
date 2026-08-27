@@ -5,3 +5,11 @@ pydantic-settings>=2.3
 python-dotenv>=1.0
 supabase>=2.7
 PyJWT>=2.9
+# Subida de archivos (multipart/form-data) para el importador de catálogo.
+# FastAPI lo exige para poder declarar UploadFile y Form en un endpoint.
+python-multipart>=0.0.9
+# Lectura de planillas del ERP. openpyxl cubre .xlsx y .xlsm, que es lo que
+# exporta cualquier ERP actual; xlrd solo existe para el .xls de Excel
+# 97-2003, que sigue apareciendo. El .csv lo lee la stdlib.
+openpyxl>=3.1
+xlrd>=2.0

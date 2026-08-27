@@ -460,6 +460,29 @@ El nombre comercial de una cadena y las notas de un pedido son texto que escribe
 - Límite de 2 MB.
 - Servir desde Supabase Storage con nombre generado por el servidor, nunca con el nombre original.
 
+### 9.4.1 Subida de planillas (importador de catálogo)
+
+Una planilla no se renderiza ni se sirve, así que el riesgo no es el mismo que
+el de un logo: acá el riesgo es de **recursos y de contenido**.
+
+- Formatos aceptados: `.xlsx`, `.xlsm`, `.xls`, `.csv`. El formato real se
+  determina por los magic bytes (`PK\x03\x04` para xlsx, el contenedor OLE2
+  para xls), no por la extensión.
+- Límite de 5 MB, y el endpoint lee como mucho ese tamaño más un byte: un
+  archivo de 2 GB nunca entra entero en memoria para recién después ser
+  rechazado.
+- Tope de 20.000 filas y 60 columnas por corrida. Una hoja con un rango sucio
+  reporta un millón de filas vacías; sin el tope, eso es el DoS.
+- El archivo **no se persiste**: se procesa en memoria y se descarta. Lo único
+  que queda es la fila de auditoría en `product_import_jobs`, con el nombre del
+  archivo, el mapeo de columnas y los conteos — nunca su contenido.
+- Todo el texto que entra por la planilla se corta a la longitud de su columna
+  antes de tocar la base (§9.1): un nombre de producto de 10 KB es el mismo
+  problema que un `full_name` de 10 MB.
+- La sucursal destino se valida contra la cadena del JWT **antes** de abrir el
+  archivo (§4.1). La vista previa devuelve nombres y conteos del catálogo de esa
+  sucursal: sin esa validación sería una forma de leer el catálogo ajeno.
+
 ### 9.5 Reglas de negocio como validación
 
 Varias validaciones son de seguridad aunque parezcan de negocio:
@@ -479,6 +502,7 @@ Varias validaciones son de seguridad aunque parezcan de negocio:
 | Cambio de estado de un pedido | `order_status_log` (quién, cuándo, nota) |
 | Aprobación / rechazo / suspensión de una cadena | `chain_verification_log` |
 | Cambio de precio | `price_history` |
+| Importación de catálogo | `product_import_jobs` (quién, qué archivo, con qué mapeo, qué hizo) |
 | Login exitoso y fallido | Logs de Supabase Auth |
 | Alta y baja de staff | Log de aplicación |
 | Cambio de datos bancarios (futuro) | Log de aplicación + notificación |

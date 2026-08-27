@@ -75,7 +75,9 @@
 
 .table {
   width: 100%;
-  min-width: 620px;
+  /* Una columna más que antes (unidades y disponible ya no son la misma cosa):
+     la tabla scrollea dentro de .tableWrap en pantallas angostas. */
+  min-width: 720px;
   border-collapse: collapse;
 }
 
@@ -138,6 +140,12 @@
 .priceStatic {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+/* Cero unidades: el producto está fuera de la góndola hasta que se reponga.
+   Se marca en la celda porque es la fila que hay que atender primero. */
+.stockEmpty {
+  color: var(--destructive);
 }
 
 .priceEdit {

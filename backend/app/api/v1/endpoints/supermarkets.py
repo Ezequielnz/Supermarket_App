@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from app.core.security import (
     get_current_staff,
@@ -17,6 +17,12 @@ from app.schemas.catalog import (
     SupermarketProductOut,
     SupermarketProductUpdate,
 )
+from app.schemas.product_import import (
+    ImportJobListResponse,
+    ImportOptions,
+    ImportPreviewResponse,
+    ImportResultResponse,
+)
 from app.schemas.supermarket import (
     ChainProfileResponse,
     ChainOut,
@@ -32,6 +38,8 @@ from app.schemas.supermarket import (
     SupermarketRegisterResponse,
 )
 from app.services import (
+    product_import_service,
+    spreadsheet_reader,
     supermarket_auth_service,
     supermarket_product_service,
     supermarket_service,
@@ -225,3 +233,122 @@ def delete_my_product(
     producto del catálogo global no se toca, porque es compartido.
     """
     supermarket_product_service.remove_product(listing_id, current_staff.chain_id)
+
+
+# ── Importación masiva desde el ERP ───────────────────────────────────────
+# Cargar 4.000 productos de a uno no es una opción, y el archivo que exporta el
+# ERP de cada cadena tiene sus propios nombres de columna. El importador los
+# reconoce, muestra qué entendió y recién escribe cuando se confirma.
+#
+# Son dos endpoints y no uno con un flag `dry_run` porque el segundo es
+# destructivo y el primero no: que la vista previa NO PUEDA escribir, por
+# construcción, vale más que ahorrarse una ruta.
+
+
+def _read_upload(file: UploadFile) -> bytes:
+    """
+    El archivo subido, en memoria y acotado.
+
+    Se leen como mucho MAX_FILE_BYTES + 1 bytes: `spreadsheet_reader` rechaza
+    con ese byte de más, y así una subida de 2 GB nunca llega a entrar entera
+    en la memoria del proceso para recién después ser rechazada.
+    """
+    return file.file.read(spreadsheet_reader.MAX_FILE_BYTES + 1)
+
+
+def _import_options(
+    sheet_name: str | None,
+    header_row: int | None,
+    mapping: str | None,
+    create_missing: bool,
+    update_existing: bool,
+    deactivate_missing: bool,
+) -> ImportOptions:
+    try:
+        return ImportOptions.from_form(
+            sheet_name, header_row, mapping, create_missing, update_existing, deactivate_missing
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/me/products/import/preview", response_model=ImportPreviewResponse)
+def preview_product_import(
+    file: UploadFile = File(...),
+    supermarket_id: UUID = Form(...),
+    sheet_name: str | None = Form(default=None),
+    header_row: int | None = Form(default=None),
+    mapping: str | None = Form(default=None),
+    create_missing: bool = Form(default=True),
+    update_existing: bool = Form(default=True),
+    deactivate_missing: bool = Form(default=False),
+    current_staff: CurrentStaff = Depends(require_approved_manager),
+):
+    """
+    Lee una planilla del ERP (.xlsx, .xls o .csv) y devuelve qué haría con
+    ella: qué columna interpretó como cada campo, cuántos productos daría de
+    alta, cuántos actualizaría y qué filas no puede procesar. **No escribe
+    nada.**
+
+    Requiere rol de encargado o responsable y cadena aprobada, igual que
+    cargar un precio a mano: es la misma operación, en lote.
+    """
+    return product_import_service.preview(
+        _read_upload(file),
+        file.filename or "planilla",
+        supermarket_id,
+        current_staff.chain_id,
+        _import_options(
+            sheet_name, header_row, mapping, create_missing, update_existing, deactivate_missing
+        ),
+    )
+
+
+@router.post(
+    "/me/products/import",
+    response_model=ImportResultResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def run_product_import(
+    file: UploadFile = File(...),
+    supermarket_id: UUID = Form(...),
+    sheet_name: str | None = Form(default=None),
+    header_row: int | None = Form(default=None),
+    mapping: str | None = Form(default=None),
+    create_missing: bool = Form(default=True),
+    update_existing: bool = Form(default=True),
+    deactivate_missing: bool = Form(default=False),
+    current_staff: CurrentStaff = Depends(require_approved_manager),
+):
+    """
+    Aplica la importación sobre una sucursal propia: crea los productos que
+    faltan en el catálogo global, actualiza precios y stock, y registra la
+    corrida en el historial.
+
+    `deactivate_missing` despublica los productos de la sucursal que el archivo
+    no menciona. Solo tiene sentido con un export COMPLETO del catálogo; por eso
+    viene en false y la vista previa muestra a cuántos afectaría.
+    """
+    return product_import_service.run(
+        _read_upload(file),
+        file.filename or "planilla",
+        supermarket_id,
+        current_staff,
+        _import_options(
+            sheet_name, header_row, mapping, create_missing, update_existing, deactivate_missing
+        ),
+    )
+
+
+@router.get("/me/products/imports", response_model=ImportJobListResponse)
+def get_my_product_imports(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=20, ge=1, le=100),
+    current_staff: CurrentStaff = Depends(require_approved_chain),
+):
+    """
+    Historial de importaciones de la cadena: qué archivo, quién lo subió, con
+    qué mapeo se leyó y qué hizo cada corrida. Lo lee cualquier staff — es la
+    respuesta a "¿por qué cambió este precio?".
+    """
+    return product_import_service.list_jobs(current_staff.chain_id, page, per_page)

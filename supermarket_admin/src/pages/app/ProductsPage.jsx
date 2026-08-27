@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Search, Trash2, Check, X } from 'lucide-react'
+import { Plus, Search, Trash2, Check, X, Upload } from 'lucide-react'
 
 import Button from '../../components/ui/Button'
 import ProductFormModal from '../../components/ProductFormModal'
+import ProductImportModal from '../../components/ProductImportModal'
 import TopBar from '../../components/TopBar'
 import { useAdminAuth } from '../../hooks/useAdminAuth'
 import { centsToInput, formatPrice, inputToCents } from '../../lib/money'
+import { formatStock, inputToStock, stockToInput } from '../../lib/stock'
 import {
   deleteMyProduct,
   getMyProducts,
@@ -16,6 +18,47 @@ import styles from './ProductsPage.module.css'
 
 const SEARCH_DEBOUNCE_MS = 300
 const ALL_STORES = ''
+
+// Qué se está editando en línea en esa fila. Son excluyentes: el precio y el
+// stock comparten el mismo estado de edición para que nunca haya dos inputs
+// abiertos compitiendo por el Enter.
+const EDIT_PRICE = 'price'
+const EDIT_STOCK = 'stock'
+
+// El input en línea de la tabla. Sale como componente porque el precio y las
+// unidades se editan igual: dos copias del mismo bloque terminan divergiendo
+// justo en el detalle que importa (el Escape que cancela, el Enter que guarda).
+function InlineEdit({ value, label, placeholder, saving, onChange, onSave, onCancel }) {
+  return (
+    <span className={styles.priceEdit}>
+      <input
+        className={styles.priceInput}
+        value={value}
+        placeholder={placeholder}
+        inputMode="decimal"
+        autoFocus
+        aria-label={label}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onSave()
+          if (e.key === 'Escape') onCancel()
+        }}
+      />
+      <button
+        type="button"
+        className={styles.iconBtn}
+        onClick={onSave}
+        disabled={saving}
+        aria-label="Guardar"
+      >
+        <Check size={15} aria-hidden="true" />
+      </button>
+      <button type="button" className={styles.iconBtn} onClick={onCancel} aria-label="Cancelar">
+        <X size={15} aria-hidden="true" />
+      </button>
+    </span>
+  )
+}
 
 export default function ProductsPage() {
   const { role } = useAdminAuth()
@@ -31,8 +74,10 @@ export default function ProductsPage() {
   const [debouncedQuery, setDebouncedQuery] = useState('')
 
   const [showModal, setShowModal] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [editingId, setEditingId] = useState(null)
-  const [priceDraft, setPriceDraft] = useState('')
+  const [editingField, setEditingField] = useState(null)
+  const [draft, setDraft] = useState('')
   const [savingId, setSavingId] = useState(null)
 
   // El rol 'staff' ve los precios pero no los toca: es lo que dice la matriz de
@@ -72,19 +117,35 @@ export default function ProductsPage() {
 
   useEffect(() => { load() }, [load])
 
-  function startEditing(row) {
+  function startEditing(row, whichField) {
     setEditingId(row.id)
-    setPriceDraft(centsToInput(row.price))
+    setEditingField(whichField)
+    setDraft(whichField === EDIT_PRICE ? centsToInput(row.price) : stockToInput(row.stock_quantity))
     setError(null)
   }
 
   function cancelEditing() {
     setEditingId(null)
-    setPriceDraft('')
+    setEditingField(null)
+    setDraft('')
+  }
+
+  async function save(row, updates) {
+    setSavingId(row.id)
+    setError(null)
+    try {
+      const updated = await updateMyProduct(row.id, updates)
+      setRows((prev) => prev.map((r) => (r.id === row.id ? updated : r)))
+      cancelEditing()
+    } catch (err) {
+      setError(err.message || 'No pudimos guardar el cambio.')
+    } finally {
+      setSavingId(null)
+    }
   }
 
   async function savePrice(row) {
-    const cents = inputToCents(priceDraft)
+    const cents = inputToCents(draft)
     if (cents === null) {
       setError('Ingresá un precio mayor a cero.')
       return
@@ -93,31 +154,26 @@ export default function ProductsPage() {
       cancelEditing()
       return
     }
-
-    setSavingId(row.id)
-    setError(null)
-    try {
-      const updated = await updateMyProduct(row.id, { price: cents })
-      setRows((prev) => prev.map((r) => (r.id === row.id ? updated : r)))
-      cancelEditing()
-    } catch (err) {
-      setError(err.message || 'No pudimos actualizar el precio.')
-    } finally {
-      setSavingId(null)
-    }
+    await save(row, { price: cents })
   }
 
-  async function toggleStock(row) {
-    setSavingId(row.id)
-    setError(null)
-    try {
-      const updated = await updateMyProduct(row.id, { inStock: !row.in_stock })
-      setRows((prev) => prev.map((r) => (r.id === row.id ? updated : r)))
-    } catch (err) {
-      setError(err.message || 'No pudimos actualizar el stock.')
-    } finally {
-      setSavingId(null)
+  async function saveStock(row) {
+    // `null` (campo vacío) es una orden válida: dejar de contar unidades. Solo
+    // `undefined` —lo que no es un número— es un error de tipeo.
+    const quantity = inputToStock(draft)
+    if (quantity === undefined) {
+      setError('Ingresá una cantidad válida, o dejá el campo vacío para no controlar unidades.')
+      return
     }
+    if (quantity === row.stock_quantity) {
+      cancelEditing()
+      return
+    }
+    await save(row, { stockQuantity: quantity })
+  }
+
+  async function toggleAvailability(row) {
+    await save(row, { inStock: !row.in_stock })
   }
 
   async function handleDelete(row) {
@@ -142,17 +198,28 @@ export default function ProductsPage() {
     await load()
   }
 
+  async function handleImported() {
+    setShowImport(false)
+    await load()
+  }
+
   return (
     <>
       <TopBar
         title="Productos"
-        description="Lo que vendés y a qué precio. El precio se edita en línea; el producto es del catálogo compartido."
+        description="Lo que vendés, a qué precio y cuántas unidades te quedan. Se edita en línea o se importa de tu ERP."
         actions={
           canManage && stores.length > 0 && (
-            <Button onClick={() => setShowModal(true)}>
-              <Plus size={16} aria-hidden="true" />
-              Agregar producto
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => setShowImport(true)}>
+                <Upload size={16} aria-hidden="true" />
+                Importar Excel
+              </Button>
+              <Button onClick={() => setShowModal(true)}>
+                <Plus size={16} aria-hidden="true" />
+                Agregar producto
+              </Button>
+            </>
           )
         }
       />
@@ -216,7 +283,8 @@ export default function ProductsPage() {
                   <th scope="col">Producto</th>
                   <th scope="col">Sucursal</th>
                   <th scope="col">Precio</th>
-                  <th scope="col">Stock</th>
+                  <th scope="col">Unidades</th>
+                  <th scope="col">Disponible</th>
                   {canManage && <th scope="col"><span className={styles.srOnly}>Acciones</span></th>}
                 </tr>
               </thead>
@@ -231,43 +299,20 @@ export default function ProductsPage() {
                     </td>
                     <td className={styles.storeCell}>{row.supermarket.name}</td>
                     <td>
-                      {editingId === row.id ? (
-                        <span className={styles.priceEdit}>
-                          <input
-                            className={styles.priceInput}
-                            value={priceDraft}
-                            inputMode="decimal"
-                            autoFocus
-                            aria-label={`Precio de ${row.product.name}`}
-                            onChange={(e) => setPriceDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') savePrice(row)
-                              if (e.key === 'Escape') cancelEditing()
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className={styles.iconBtn}
-                            onClick={() => savePrice(row)}
-                            disabled={savingId === row.id}
-                            aria-label="Guardar precio"
-                          >
-                            <Check size={15} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.iconBtn}
-                            onClick={cancelEditing}
-                            aria-label="Cancelar"
-                          >
-                            <X size={15} aria-hidden="true" />
-                          </button>
-                        </span>
+                      {editingId === row.id && editingField === EDIT_PRICE ? (
+                        <InlineEdit
+                          value={draft}
+                          label={`Precio de ${row.product.name}`}
+                          saving={savingId === row.id}
+                          onChange={setDraft}
+                          onSave={() => savePrice(row)}
+                          onCancel={cancelEditing}
+                        />
                       ) : canManage ? (
                         <button
                           type="button"
                           className={styles.priceBtn}
-                          onClick={() => startEditing(row)}
+                          onClick={() => startEditing(row, EDIT_PRICE)}
                           aria-label={`Editar el precio de ${row.product.name}`}
                         >
                           {formatPrice(row.price)}
@@ -277,14 +322,42 @@ export default function ProductsPage() {
                       )}
                     </td>
                     <td>
+                      {editingId === row.id && editingField === EDIT_STOCK ? (
+                        <InlineEdit
+                          value={draft}
+                          label={`Unidades de ${row.product.name} en ${row.supermarket.name}`}
+                          placeholder="Sin control"
+                          saving={savingId === row.id}
+                          onChange={setDraft}
+                          onSave={() => saveStock(row)}
+                          onCancel={cancelEditing}
+                        />
+                      ) : canManage ? (
+                        <button
+                          type="button"
+                          className={`${styles.priceBtn} ${row.stock_quantity === 0 ? styles.stockEmpty : ''}`}
+                          onClick={() => startEditing(row, EDIT_STOCK)}
+                          aria-label={`Editar las unidades de ${row.product.name} en ${row.supermarket.name}`}
+                        >
+                          {formatStock(row.stock_quantity)}
+                        </button>
+                      ) : (
+                        <span className={styles.priceStatic}>{formatStock(row.stock_quantity)}</span>
+                      )}
+                    </td>
+                    <td>
                       {canManage ? (
                         <label className={styles.stockToggle}>
                           <input
                             type="checkbox"
                             checked={row.in_stock}
-                            disabled={savingId === row.id}
-                            onChange={() => toggleStock(row)}
-                            aria-label={`Stock de ${row.product.name} en ${row.supermarket.name}`}
+                            /* Con 0 unidades el switch no se puede encender: la
+                               base lo vuelve a apagar (trigger de la 024). Se
+                               deshabilita para no ofrecer algo que se deshace
+                               solo. */
+                            disabled={savingId === row.id || row.stock_quantity === 0}
+                            onChange={() => toggleAvailability(row)}
+                            aria-label={`Publicar ${row.product.name} en ${row.supermarket.name}`}
                           />
                           <span>{row.in_stock ? 'Sí' : 'No'}</span>
                         </label>
@@ -319,6 +392,15 @@ export default function ProductsPage() {
           defaultStoreId={storeId || undefined}
           onClose={() => setShowModal(false)}
           onCreated={handleCreated}
+        />
+      )}
+
+      {showImport && (
+        <ProductImportModal
+          stores={stores}
+          defaultStoreId={storeId || undefined}
+          onClose={() => setShowImport(false)}
+          onImported={handleImported}
         />
       )}
     </>

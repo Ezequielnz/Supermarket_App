@@ -23,6 +23,11 @@ DEFAULT_CURRENCY = "ARS"
 # corto para no convertir el buscador en un volcado del catálogo ajeno.
 LOOKUP_LIMIT = 10
 
+# supermarket_products.stock_quantity es NUMERIC(10,2): el tope evita que un
+# 999999999 se coma el CHECK con un error de rango de Postgres (que sale como
+# 500) en vez de un 422 con el campo.
+MAX_STOCK_QUANTITY = 99_999_999.99
+
 
 class ProductDraft(BaseModel):
     """
@@ -52,6 +57,10 @@ class SupermarketProductCreate(BaseModel):
     supermarket_id: UUID4
     price: int = Field(gt=0, description="Centavos. Nunca float (NORMAS.md §4.3).")
     in_stock: bool = True
+    # None = esta sucursal no lleva control unitario de este producto (granel).
+    # Es distinto de 0, que significa "no queda ninguno" y lo saca de la venta.
+    # Ver la migración 024.
+    stock_quantity: float | None = Field(default=None, ge=0, le=MAX_STOCK_QUANTITY)
     product_id: UUID4 | None = None
     product: ProductDraft | None = None
 
@@ -73,10 +82,14 @@ class SupermarketProductUpdate(BaseModel):
 
     price: int | None = Field(default=None, gt=0)
     in_stock: bool | None = None
+    stock_quantity: float | None = Field(default=None, ge=0, le=MAX_STOCK_QUANTITY)
 
     @model_validator(mode="after")
     def at_least_one_field(self):
-        if self.price is None and self.in_stock is None:
+        # `model_fields_set` y no `is None`: mandar `stock_quantity: null` es una
+        # orden legítima —"dejá de contar unidades de este producto"— y con la
+        # comprobación por None sería indistinguible de no haberlo mandado.
+        if not self.model_fields_set:
             raise ValueError("No hay campos para actualizar.")
         return self
 
@@ -106,6 +119,7 @@ class SupermarketProductOut(BaseModel):
     price: int
     currency: str
     in_stock: bool
+    stock_quantity: float | None = None
     updated_at: datetime
 
 

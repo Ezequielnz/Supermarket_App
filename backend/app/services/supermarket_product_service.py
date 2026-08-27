@@ -43,6 +43,7 @@ def _to_out(row: dict) -> SupermarketProductOut:
         price=row["price"],
         currency=row["currency"],
         in_stock=row["in_stock"],
+        stock_quantity=row.get("stock_quantity"),
         updated_at=row["updated_at"],
     )
 
@@ -159,6 +160,7 @@ def add_product(payload: SupermarketProductCreate, chain_id: UUID) -> Supermarke
                     "price": payload.price,
                     "currency": DEFAULT_CURRENCY,
                     "in_stock": payload.in_stock,
+                    "stock_quantity": payload.stock_quantity,
                 }
             )
             .execute()
@@ -183,12 +185,17 @@ def update_product(
     listing_id: UUID, payload: SupermarketProductUpdate, chain_id: UUID
 ) -> SupermarketProductOut:
     """
-    Cambia precio o stock. El trigger record_price_change (016) archiva el
-    valor anterior en price_history por su cuenta: no hay que hacer nada extra.
+    Cambia precio, disponibilidad o unidades. El trigger record_price_change
+    (016) archiva el precio anterior en price_history por su cuenta, y el de la
+    024 baja `in_stock` solo si las unidades llegan a cero: no hay que hacer
+    nada extra por ninguno de los dos.
     """
     get_listing_or_404(listing_id, chain_id)
 
-    updates = payload.model_dump(exclude_none=True)
+    # exclude_unset y no exclude_none: `{"stock_quantity": null}` significa
+    # "dejá de contar unidades de este producto" y tiene que llegar a la base
+    # como NULL. Con exclude_none esa orden se perdía en silencio.
+    updates = payload.model_dump(exclude_unset=True)
     client = get_supabase()
     client.table("supermarket_products").update(updates).eq("id", str(listing_id)).execute()
 

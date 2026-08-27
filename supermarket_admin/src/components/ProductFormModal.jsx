@@ -5,6 +5,7 @@ import Button from './ui/Button'
 import Field from './ui/Field'
 import Input from './ui/Input'
 import { inputToCents } from '../lib/money'
+import { inputToStock } from '../lib/stock'
 import { createMyProduct, lookupProduct } from '../services/products.service'
 import styles from './ProductFormModal.module.css'
 
@@ -34,6 +35,7 @@ export default function ProductFormModal({ stores, defaultStoreId, onClose, onCr
   const [linkedProduct, setLinkedProduct] = useState(null)
   const [draft, setDraft] = useState(EMPTY_DRAFT)
   const [price, setPrice] = useState('')
+  const [stock, setStock] = useState('')
   const [inStock, setInStock] = useState(true)
 
   const dialogRef = useRef(null)
@@ -99,6 +101,13 @@ export default function ProductFormModal({ stores, defaultStoreId, onClose, onCr
       setError('Ingresá un precio mayor a cero.')
       return
     }
+    // Vacío es `null` y significa "no llevo control de unidades" (granel), que
+    // es distinto de cero. Solo undefined es un error de tipeo.
+    const quantity = inputToStock(stock)
+    if (quantity === undefined) {
+      setError('Las unidades tienen que ser un número, o dejalo vacío si no las controlás.')
+      return
+    }
     if (!storeId) {
       setError('Elegí la sucursal donde se vende.')
       return
@@ -111,6 +120,7 @@ export default function ProductFormModal({ stores, defaultStoreId, onClose, onCr
         supermarketId: storeId,
         price: cents,
         inStock,
+        stockQuantity: quantity,
         productId: linkedProduct?.id,
         product: linkedProduct
           ? undefined
@@ -412,6 +422,25 @@ export default function ProductFormModal({ stores, defaultStoreId, onClose, onCr
                 )}
               </Field>
 
+              <Field
+                id="listing-stock-qty"
+                label="Unidades"
+                hint="Dejalo vacío si vendés a granel y no contás unidades. En cero, el producto no se ofrece."
+              >
+                {({ id, describedBy }) => (
+                  <Input
+                    id={id}
+                    value={stock}
+                    inputMode="decimal"
+                    placeholder="Sin control"
+                    onChange={(e) => setStock(e.target.value)}
+                    aria-describedby={describedBy}
+                  />
+                )}
+              </Field>
+            </div>
+
+            <div className={styles.row}>
               <div className={styles.stockField}>
                 <label className={styles.checkboxLabel} htmlFor="listing-stock">
                   <input
@@ -420,7 +449,7 @@ export default function ProductFormModal({ stores, defaultStoreId, onClose, onCr
                     checked={inStock}
                     onChange={(e) => setInStock(e.target.checked)}
                   />
-                  Hay stock
+                  Publicar en la góndola
                 </label>
               </div>
             </div>
