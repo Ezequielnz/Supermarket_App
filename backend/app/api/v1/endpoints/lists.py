@@ -15,10 +15,16 @@ from app.schemas.shopping_list import (
     ShoppingListListResponse,
     ShoppingListOut,
     ShoppingListUpdate,
+    SplitCompareResponse,
 )
 from app.services import comparison_service, list_service
 
 router = APIRouter(prefix="/lists", tags=["lists"])
+
+# Dividir la compra en dos supermercados es el caso que pide el usuario que
+# quiere ahorrar sin convertir la compra en una excursión. Puede pedir más, con
+# el tope de comparison_service.MAX_SPLIT_SUPERMARKETS.
+DEFAULT_SPLIT_SUPERMARKETS = 2
 
 
 @router.get("", response_model=ShoppingListListResponse)
@@ -118,3 +124,22 @@ def remove_item(list_id: UUID, item_id: UUID, current_user: CurrentUser = Depend
 def compare_list(list_id: UUID, current_user: CurrentUser = Depends(get_current_user)):
     """Compara el precio total de una lista propia entre todos los supermercados."""
     return comparison_service.compare_list(list_id, current_user.id)
+
+
+@router.get("/{list_id}/compare/split", response_model=SplitCompareResponse)
+def split_list(
+    list_id: UUID,
+    max_supermarkets: int = Query(
+        default=DEFAULT_SPLIT_SUPERMARKETS, ge=2, le=comparison_service.MAX_SPLIT_SUPERMARKETS
+    ),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """
+    Arma el plan de compra más barato repartiendo la lista entre hasta
+    `max_supermarkets` supermercados distintos.
+
+    Es la otra mitad de `/compare`: aquel responde "¿dónde compro todo?", este
+    responde "¿y si compro cada cosa donde está más barata?". El mínimo es 2
+    porque con uno solo la respuesta ya la da `/compare`.
+    """
+    return comparison_service.split_list(list_id, current_user.id, max_supermarkets)

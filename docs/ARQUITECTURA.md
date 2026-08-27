@@ -71,6 +71,7 @@ supermarket_front/src/
 │   ├── Navbar.jsx / .module.css      # solo la landing publica
 │   ├── AppNav.jsx / .module.css      # navegacion de /app + badge del carrito
 │   ├── CartDrawer.jsx / .module.css
+│   ├── SplitPlan.jsx / .module.css   # plan de compra repartido entre supers
 │   └── shared/                # ProtectedRoute
 ├── pages/
 │   ├── LandingPage.jsx        # / — publica
@@ -79,15 +80,17 @@ supermarket_front/src/
 │       ├── DashboardPage.jsx  # /app
 │       ├── ExplorePage.jsx    # /app/explore — catalogo con precios
 │       ├── ListsPage.jsx      # /app/lists
-│       ├── ListDetailPage.jsx # /app/lists/:id — comparador
+│       ├── ListDetailPage.jsx # /app/lists/:id — comparador + plan dividido
 │       ├── CheckoutPage.jsx   # /app/checkout
 │       ├── OrdersPage.jsx     # /app/orders
 │       └── TrackingPage.jsx   # /app/orders/:id
 ├── hooks/
 │   ├── useAuth.js
 │   ├── useCart.js
+│   ├── useCompare.js          # comparador por supermercado, con cache
 │   ├── useLists.js
-│   └── useOrders.js
+│   ├── useOrders.js
+│   └── useSplitPlan.js        # plan dividido, con cache por tope de supers
 ├── lib/
 │   └── money.js               # centavos <-> pesos, en un solo lugar
 ├── services/
@@ -127,14 +130,23 @@ supermarket_front/src/
       |                      |                  |
       └──> "Comparar precios" <──[Crear/editar lista]
                    |
-         [Comparar precios por supermercado]
+         [Como querer comprar]
+              |              |
+   [Un solo supermercado]  [Varios supermercados]
+    — comparador §9          — plan dividido §9.1
+              |              |
+         [Elegir + fecha/hora de retiro]
                    |
-         [Elegir supermercado + fecha/hora de retiro]
-                   |
-         [Confirmar pedido]
+         [Confirmar pedido]  /  [Confirmar N pedidos, uno por super]
                    |
          [Seguimiento: Recibido → Preparando → Listo → Completado]
 ```
+
+Las dos formas de comprar la misma lista conviven en la misma pantalla, como
+dos pestañas: comprar todo en el supermercado mas conveniente, o repartir la
+compra para bajar el total. La segunda no reemplaza a la primera — dos paradas
+no siempre valen el ahorro, y por eso el plan dividido muestra siempre cuanto
+se ahorra contra el mejor supermercado unico.
 
 **El carrito ES una lista de compras** (`shopping_lists.is_cart = true`), no una
 tabla aparte. Por eso el carrito y una lista guardada desembocan en el mismo
@@ -319,6 +331,7 @@ backend/
 | PATCH | /lists/{id}/items/{item_id} | Fijar cantidad | Consumidor |
 | DELETE | /lists/{id}/items/{item_id} | Quitar producto | Consumidor |
 | GET | /lists/{id}/compare | Comparar precios | Consumidor |
+| GET | /lists/{id}/compare/split | Plan repartido entre varios supers (`?max_supermarkets=2..4`) | Consumidor |
 
 #### Carrito
 | Metodo | Ruta | Descripcion | Rol |
@@ -340,6 +353,7 @@ backend/
 | Metodo | Ruta | Descripcion | Rol |
 |---|---|---|---|
 | POST | /orders | Crear pedido | Consumidor |
+| POST | /orders/split | Confirmar un plan dividido: N pedidos, una transaccion | Consumidor |
 | GET | /orders | Mis pedidos | Consumidor |
 | GET | /orders/{id} | Detalle + estado | Consumidor |
 | GET | /orders/{id}/status | Estado actual (polling) | Consumidor |
@@ -614,6 +628,95 @@ error garantizado.
       "missing": [],
       "items": [
         { "product_id": "...", "product_name": "Leche 1L", "price": 1250, "in_stock": true }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## 9.1 Compra Dividida entre Varios Supermercados
+
+**Endpoints:** GET /api/v1/lists/{id}/compare/split?max_supermarkets=N ·
+POST /api/v1/orders/split
+
+§9 responde "¿donde compro TODO?". Esta responde la otra pregunta que se hace
+el usuario parado frente a su lista: "¿y si compro cada cosa donde esta mas
+barata?". Las dos conviven en la misma pantalla: el ahorro de dividir se anuncia
+en el comparador comun, con el numero concreto, porque el que esta mirando una
+sola tienda no sabe que la otra opcion existe.
+
+`max_supermarkets` va de **2 a 4** (`MAX_SPLIT_SUPERMARKETS`). Menos de 2 ya lo
+responde `/compare`; mas de 4 paradas no es una compra, es una excursion.
+
+### El algoritmo
+
+1. Mismos datos y mismos filtros que §9: items en orden estable, precios con
+   stock, y solo supermercados activos de cadenas aprobadas
+   (`is_supermarket_visible`, en Python porque el backend bypasea RLS).
+2. Costo por item redondeado, `round(price * quantity)`, igual que el comparador
+   y que `order_service`: el total que promete el plan tiene que ser el que
+   cobra el pedido.
+3. **Si comprar cada producto donde esta mas barato entra en el tope, eso ES el
+   minimo posible** y no hay nada que buscar. Es el caso normal con pocos
+   supermercados.
+4. Si no entra, se busca la mejor combinacion de `max_supermarkets` tiendas:
+   primero la que cubre **mas productos**, y a igual cobertura, la mas barata.
+   La cobertura va primero por lo mismo que en §9 — un plan mas barato al que le
+   falta media lista no es mas barato, es incompleto.
+5. Los productos que quedan afuera —porque no los vende nadie, o porque no
+   entran en el tope— se nombran en `missing`. Nunca se inventa un precio.
+6. `best_single_total` es el mejor total de comprar en **una sola** tienda,
+   medido sobre los mismos productos que cubre el plan, y `savings` es la
+   diferencia. Es el numero que justifica (o no) la segunda parada.
+
+> **Por que se prueban combinaciones.** Elegir k tiendas que minimicen el total
+> es un problema de cobertura: no hay atajo exacto. Por eso entran a la busqueda
+> como mucho `MAX_SPLIT_CANDIDATES = 15` supermercados, rankeados por utilidad
+> (en cuantos productos son los mas baratos, y cuantos cubren). Con 15
+> candidatos y k <= 4 son 1365 combinaciones: milisegundos. Sin ese tope, un
+> pais entero de supermercados hace explotar el endpoint.
+
+### Confirmar el plan
+
+`POST /orders/split` recibe los grupos (`supermarket_id` + `product_ids`) y crea
+**un pedido por supermercado**. El request **no lleva precios**: los relee el
+backend, porque entre que el usuario miro el plan y confirmo, el supermercado
+pudo cambiar el precio o quedarse sin stock.
+
+Se valida, en este orden: la lista es del usuario y tiene productos; ningun
+supermercado se repite; los grupos cubren la lista **entera**, cada producto
+exactamente una vez (409 si no); cada supermercado es visible y tiene stock de
+lo suyo (409 nombrando cual).
+
+Los N pedidos se escriben en **una sola transaccion**
+(`create_orders_with_items`, migracion 024). Con N llamadas a la RPC de la 006,
+una falla en la tercera dejaria al usuario con dos pedidos hechos y un tercio de
+la compra sin encargar, sin forma de saberlo desde la pantalla de confirmacion.
+
+**Respuesta de `/compare/split`:**
+```json
+{
+  "list_id": "...",
+  "items_count": 8,
+  "generated_at": "2026-08-27T14:05:00Z",
+  "max_supermarkets": 2,
+  "supermarkets_count": 2,
+  "total": 98000,
+  "currency": "ARS",
+  "is_complete": true,
+  "missing": [],
+  "best_single_total": 104500,
+  "savings": 6500,
+  "groups": [
+    {
+      "supermarket": { "id": "...", "name": "Vital" },
+      "subtotal": 62000,
+      "currency": "ARS",
+      "items": [
+        { "product_id": "...", "product_name": "Leche 1L",
+          "quantity": 2, "price": 1250, "subtotal": 2500 }
       ]
     }
   ]

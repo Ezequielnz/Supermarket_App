@@ -36,3 +36,11 @@ export async function removeItem(listId, itemId) {
 export async function compareList(id) {
   return apiClient.get(`/lists/${id}/compare`, { auth: true })
 }
+
+// El plan de compra más barato repartiendo la lista entre varios
+// supermercados. Es la otra mitad de compareList: aquel responde "¿dónde
+// compro todo?", este "¿y si compro cada cosa donde está más barata?".
+export async function compareListSplit(id, { maxSupermarkets }) {
+  const params = new URLSearchParams({ max_supermarkets: maxSupermarkets })
+  return apiClient.get(`/lists/${id}/compare/split?${params.toString()}`, { auth: true })
+}

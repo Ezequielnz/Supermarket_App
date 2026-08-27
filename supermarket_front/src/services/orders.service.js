@@ -29,3 +29,22 @@ export async function getOrderStatus(id) {
 export async function cancelOrder(id, { reason } = {}) {
   return apiClient.post(`/orders/${id}/cancel`, { reason }, { auth: true })
 }
+
+// Confirma un plan de compra dividida: el backend crea un pedido por
+// supermercado, todos en la misma transacción. `groups` viaja sin precios: el
+// total lo recalcula el backend contra los precios de hoy.
+export async function createSplitOrder({ listId, pickupScheduled, notes, groups }) {
+  return apiClient.post(
+    '/orders/split',
+    {
+      list_id: listId,
+      pickup_scheduled: pickupScheduled,
+      notes,
+      groups: groups.map((group) => ({
+        supermarket_id: group.supermarketId,
+        product_ids: group.productIds,
+      })),
+    },
+    { auth: true },
+  )
+}

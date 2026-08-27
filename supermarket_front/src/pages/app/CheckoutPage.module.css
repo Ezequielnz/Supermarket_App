@@ -103,3 +103,58 @@
 }
 
 .submitBtn:disabled { opacity: 0.65; cursor: not-allowed; }
+
+/* Compra dividida: una fila por parada, antes del total. El usuario tiene que
+   ver a cuantos lugares lo estamos mandando ANTES de confirmar, no despues. */
+.stops {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stop {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  padding: 0.75rem 1rem;
+  font-size: 0.9375rem;
+}
+
+.stopBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stopName { font-weight: 700; }
+
+.stopMeta {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.stopTotal {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.savings {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: -0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--primary);
+}

@@ -222,6 +222,7 @@ Además, siempre `SET search_path = public` en la definición: sin eso, un `sear
 
 Casos concretos del proyecto:
 - `create_order_with_items` — sin `REVOKE`, cualquiera falsifica pedidos a nombre de otro pasando otro `p_user_id`.
+- `create_orders_with_items` (compra dividida, migración 024) — lo mismo, multiplicado por la cantidad de supermercados del plan.
 - `review_chain` — sin `REVOKE`, cualquier cadena se auto-aprueba y entra al comparador.
 
 **Única excepción admitida:** una función sin parámetros que se auto-acote con

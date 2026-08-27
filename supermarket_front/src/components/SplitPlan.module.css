@@ -1,0 +1,186 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.muted { color: var(--muted-foreground); font-size: 0.9375rem; }
+
+.errorText {
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--destructive) 12%, var(--card));
+  border: 1.5px solid color-mix(in oklch, var(--destructive) 35%, transparent);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--destructive);
+}
+
+/* Tope de paradas. Mismo gesto que los chips de categoría de Explorar: elegir
+   entre pocas opciones fijas, sin abrir un select. */
+.limits {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.limitsLabel {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.limitBtn {
+  border-radius: 9999px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+  transition: background 200ms, color 200ms, border-color 200ms;
+}
+
+.limitBtn[data-active='true'] {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.limitBtn:hover:not(:disabled):not([data-active='true']) {
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
+.limitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.group {
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  padding: 0.875rem 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.groupName {
+  font-weight: 700;
+  min-width: 0;
+}
+
+.groupTotal {
+  margin-left: auto;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.groupItems {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  list-style: none;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+.groupItem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+
+.itemPrice {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.missing {
+  font-size: 0.8125rem;
+  color: var(--destructive);
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  padding: 0.875rem 1.125rem;
+}
+
+.totalRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.9375rem;
+}
+
+.totalRow span { color: var(--muted-foreground); }
+
+.total {
+  font-size: 1.125rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+/* El ahorro es el dato que justifica la segunda parada: va destacado, no como
+   una nota al pie. */
+.savings {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.noSavings {
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+
+.buyBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  padding: 0.8125rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.buyBtn:disabled { opacity: 0.45; cursor: not-allowed; }

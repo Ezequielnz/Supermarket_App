@@ -333,3 +333,53 @@
   font-weight: 700;
   color: var(--muted-foreground);
 }
+
+/* Las dos formas de comprar la lista: un solo supermercado o varios. Es un
+   segmented control, no dos pantallas — la comparacion y el plan dividido son
+   dos respuestas a la misma pregunta. */
+.modes {
+  display: flex;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  padding: 0.25rem;
+}
+
+.modeBtn {
+  flex: 1;
+  border-radius: 9999px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+  transition: background 200ms, color 200ms;
+}
+
+.modeBtn[data-active='true'] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.modeBtn:hover:not([data-active='true']) { color: var(--foreground); }
+
+/* El aviso de ahorro que lleva a la pestaña de dividir. Es un boton y no un
+   cartel: dice un numero concreto y ademas hace algo con el. */
+.savingsHint {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  border-radius: var(--radius);
+  border: 1.5px solid color-mix(in oklch, var(--primary) 40%, transparent);
+  background: color-mix(in oklch, var(--primary) 12%, var(--card));
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--foreground);
+  transition: background 200ms;
+}
+
+.savingsHint:hover { background: color-mix(in oklch, var(--primary) 20%, var(--card)); }
+
+.savingsHint span { flex: 1; }

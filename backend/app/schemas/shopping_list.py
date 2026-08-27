@@ -119,3 +119,57 @@ class CompareResponse(BaseModel):
     # así que el usuario tiene que poder ver qué tan fresco es el número.
     generated_at: datetime
     results: list[CompareResultOut]
+
+
+# ── Compra dividida entre varios supermercados ────────────────────────────
+# El comparador de arriba responde "¿dónde compro TODO?". Estos schemas
+# responden la otra pregunta: "¿y si compro cada cosa donde está más barata?".
+# Ver docs/ARQUITECTURA.md §9.1.
+
+
+class SplitPlanItemOut(BaseModel):
+    """Un producto de la lista, asignado al supermercado que lo cubre."""
+
+    product_id: UUID4
+    product_name: str
+    quantity: float
+    price: int
+    # round(price * quantity), igual que el comparador y que order_service:
+    # el número que promete el plan tiene que ser el que cobra el pedido.
+    subtotal: int
+
+
+class SplitPlanGroupOut(BaseModel):
+    """Todo lo que hay que comprar en UN supermercado del plan."""
+
+    supermarket: SupermarketOut
+    subtotal: int
+    currency: str
+    items: list[SplitPlanItemOut]
+
+
+class SplitCompareResponse(BaseModel):
+    list_id: UUID4
+    items_count: int
+    generated_at: datetime
+    # El tope de supermercados que pidió el usuario, y cuántos usa el plan.
+    # No siempre coinciden: si con dos alcanza para el mínimo, el plan no
+    # inventa un tercer viaje para llenar el cupo.
+    max_supermarkets: int
+    supermarkets_count: int
+    total: int
+    # Null cuando no hay nada que comprar: la moneda sale de los precios, no se
+    # inventa un default.
+    currency: str | None = None
+    is_complete: bool
+    # Productos que el plan NO cubre: o no los vende ningún supermercado
+    # visible, o no entran en el tope de supermercados elegido.
+    missing: list[CompareMissingItemOut] = []
+    # El mejor total de comprar TODO en un solo supermercado, comparado sobre
+    # los mismos productos que cubre el plan. Null si ningún supermercado los
+    # cubre todos: ahí dividir no es una opción más barata, es la única.
+    best_single_total: int | None = None
+    # best_single_total - total, nunca negativo. Es el número que justifica el
+    # segundo viaje: si es 0, no vale la pena dividir.
+    savings: int = 0
+    groups: list[SplitPlanGroupOut] = []

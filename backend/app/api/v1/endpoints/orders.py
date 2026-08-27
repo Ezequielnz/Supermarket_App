@@ -11,6 +11,8 @@ from app.schemas.order import (
     OrderListResponse,
     OrderResponse,
     OrderStatusResponse,
+    SplitOrderCreate,
+    SplitOrderResponse,
 )
 from app.services import order_service
 
@@ -21,6 +23,18 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 def create_order(payload: OrderCreate, current_user: CurrentUser = Depends(get_current_user)):
     """Crea un pedido a partir de una lista propia y un supermercado activo."""
     return order_service.create_order(payload, current_user.id)
+
+
+@router.post("/split", response_model=SplitOrderResponse, status_code=status.HTTP_201_CREATED)
+def create_split_order(payload: SplitOrderCreate, current_user: CurrentUser = Depends(get_current_user)):
+    """
+    Confirma un plan de compra dividida: crea un pedido por supermercado, todos
+    en la misma transacción.
+
+    Va declarado antes de las rutas /{order_id} por la misma razón que las del
+    carrito en lists.py: FastAPI resuelve por orden de registro.
+    """
+    return order_service.create_split_order(payload, current_user.id)
 
 
 @router.get("", response_model=OrderListResponse)
